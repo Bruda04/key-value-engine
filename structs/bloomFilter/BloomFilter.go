@@ -38,7 +38,7 @@ func getSize(numEl int, probability float64) int {
 	return int(-float64(numEl) * math.Log(probability) / math.Pow(math.Log(2), 2))
 }
 
-// adding new elements, uses murmur hash
+// adding new elements
 func (b *BloomFilter) Add(element []byte) {
 	for i := 0; i < int(b.hashNum); i++ {
 		position := b.hashFunctions[i].Hash(element) % uint64(b.size)
@@ -46,7 +46,6 @@ func (b *BloomFilter) Add(element []byte) {
 	}
 }
 
-// currently accepts strings
 func (b *BloomFilter) IsPresent(element []byte) bool {
 	for i := 0; i < int(b.hashNum); i++ {
 		position := b.hashFunctions[i].Hash(element) % uint64(b.size)
