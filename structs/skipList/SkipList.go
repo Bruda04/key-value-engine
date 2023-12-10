@@ -1,4 +1,4 @@
-package main
+package skipList
 
 import (
 	"math/rand"
