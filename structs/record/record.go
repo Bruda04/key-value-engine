@@ -161,3 +161,13 @@ func BytesToRecord(bytes []byte) *Record {
 
 	return &r
 }
+
+/*
+Size calculates the Record size in bytes.
+
+Returns:
+  - int: Record size in bytes.
+*/
+func (r *Record) Size() int {
+	return int(CRC_SIZE + TIMESTAMP_SIZE + TOMBSTONE_SIZE + KEY_SIZE_SIZE + VALUE_SIZE_SIZE + r.keySize + r.valueSize)
+}
