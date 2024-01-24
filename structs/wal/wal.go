@@ -15,6 +15,14 @@ const (
 	EXT       = ".log"
 )
 
+/*
+Structure:
+- SegmentSize: Size of each WAL segment file.
+- SegmentFiles: List of filenames representing WAL segment files.
+- RepairFileIndex: Index of the current WAL segment file being repaired.
+- RepairOffset: Offset within the current WAL segment file during repair operations.
+*/
+
 type WAL struct {
 	SegmentSize     int64
 	SegmentFiles    []string
@@ -22,6 +30,16 @@ type WAL struct {
 	RepairOffset    int64
 }
 
+/*
+MakeWAL initializes and returns a new WAL instance.
+
+Parameters:
+- segmentSize: Size of each WAL segment file.
+
+Returns:
+- *WAL: Pointer to the created WAL instance.
+- error: Error, if any, during the initialization process.
+*/
 func MakeWAL(segmentSize int64) (*WAL, error) {
 	if err := os.MkdirAll(DIRECTORY, 0755); err != nil {
 		return nil, fmt.Errorf("error creating data directory: %s", err)
@@ -54,6 +72,15 @@ func MakeWAL(segmentSize int64) (*WAL, error) {
 	return wal, nil
 }
 
+/*
+createInitialSegmentFile creates the initial WAL segment file with an overflow record part.
+
+Parameters:
+- filename: Name of the segment file.
+
+Returns:
+- error: Error, if any, during file creation.
+*/
 func createInitialSegmentFile(filename string) error {
 	f, err := os.Create(filename)
 	if err != nil {
@@ -73,6 +100,17 @@ func createInitialSegmentFile(filename string) error {
 	return err
 }
 
+/*
+AddRecord appends a new record to the WAL, handling record overflow by creating new segments.
+
+Parameters:
+- key: Key for the new record.
+- value: Value associated with the key.
+- deleted: Flag indicating if the record is marked as deleted.
+
+Returns:
+- error: Error, if any, during the record addition process.
+*/
 func (wal *WAL) AddRecord(key string, value []byte, deleted bool) error {
 	rec := record.MakeRecord(key, value, deleted)
 	recordBytes := rec.RecordToBytes()
@@ -195,6 +233,12 @@ func (wal *WAL) AddRecord(key string, value []byte, deleted bool) error {
 	return nil
 }
 
+/*
+makeSegment creates a new WAL segment file.
+
+Returns:
+- error: Error, if any, during segment creation.
+*/
 func (wal *WAL) makeSegment() error {
 	newSegmentFile := FILEPATH + fmt.Sprintf("_%d.log", len(wal.SegmentFiles)+1)
 	wal.SegmentFiles = append(wal.SegmentFiles, newSegmentFile)
@@ -220,6 +264,16 @@ func (wal *WAL) makeSegment() error {
 	return nil
 }
 
+/*
+RestoreRecord retrieves and restores a record from the WAL based on the provided offset.
+
+Parameters:
+- offset: Offset within the WAL to start the restoration process.
+
+Returns:
+- *record.Record: Restored record.
+- error: Error, if any, during the restoration process.
+*/
 func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 	if offset != -1 {
 		wal.RepairOffset = offset
@@ -376,6 +430,12 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 	return rec, nil
 }
 
+/*
+deleteLWM deletes WAL segment files up to the specified Low Watermark (LWM).
+
+Parameters:
+- lwm: Low Watermark specifying the index up to which segments should be deleted.
+*/
 func (wal *WAL) deleteLWM(lwm uint64) {
 	toDelte := make([]string, lwm)
 	copy(toDelte, wal.SegmentFiles[:lwm])
@@ -395,6 +455,9 @@ func (wal *WAL) deleteLWM(lwm uint64) {
 
 }
 
+/*
+renameSegments renames WAL segment files to maintain sequential order.
+*/
 func (wal *WAL) renameSegments() {
 
 	for i := 0; i < len(wal.SegmentFiles); i++ {
