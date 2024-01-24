@@ -1,0 +1,7 @@
+{
+  "wal_size": 500,
+  "memtable_size": 1000,
+  "memtable_structure": "btree",
+  "btree_degree": 4,
+  "cahce_size": 50
+}
