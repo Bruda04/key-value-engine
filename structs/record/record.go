@@ -2,6 +2,7 @@ package record
 
 import (
 	"encoding/binary"
+	"fmt"
 	"hash/crc32"
 	"time"
 )
@@ -160,4 +161,43 @@ func BytesToRecord(bytes []byte) *Record {
 	r.value = bytes[KEY_START+r.keySize : KEY_START+r.keySize+r.valueSize]
 
 	return &r
+}
+
+/*
+Size calculates the Record size in bytes.
+
+Returns:
+  - int: Record size in bytes.
+*/
+func (r *Record) Size() int {
+	return int(CRC_SIZE + TIMESTAMP_SIZE + TOMBSTONE_SIZE + KEY_SIZE_SIZE + VALUE_SIZE_SIZE + r.keySize + r.valueSize)
+}
+
+/*
+Size calculates the total size of a record based on the provided header.
+
+Parameters:
+  - header: A byte slice representing the header of the record.
+
+Returns:
+  - int: The total size of the record calculated based on the information in the header.
+*/
+func Size(header []byte) int {
+	keySize := binary.LittleEndian.Uint64(header[KEY_SIZE_START:VALUE_SIZE_START])
+	valueSize := binary.LittleEndian.Uint64(header[VALUE_SIZE_START:RECORD_HEADER_SIZE])
+	return int(CRC_SIZE + TIMESTAMP_SIZE + TOMBSTONE_SIZE + KEY_SIZE_SIZE + VALUE_SIZE_SIZE + keySize + valueSize)
+
+}
+
+/*
+PrintRecord prints the fields of a Record struct in a formatted way.
+*/
+func (r *Record) PrintRecord() {
+	fmt.Printf("CRC: %d\n", r.crc)
+	fmt.Printf("Timestamp: %d\n", r.timestamp)
+	fmt.Printf("Tombstone: %t\n", r.tombstone)
+	fmt.Printf("Key Size: %d\n", r.keySize)
+	fmt.Printf("Value Size: %d\n", r.valueSize)
+	fmt.Printf("Key: %s\n", r.key)
+	fmt.Printf("Value: %v\n", r.value)
 }
