@@ -30,7 +30,7 @@ Returns:
 */
 func MakeRecord(key string, value []byte, deleted bool) *Record {
 	return &Record{
-		crc:       crcHash(value),
+		crc:       CrcHash(value),
 		timestamp: uint64(time.Now().Unix()),
 		tombstone: deleted,
 		keySize:   uint64(len([]byte(key))),
@@ -58,7 +58,7 @@ const (
 )
 
 /*
-crcHash calculates the CRC32 hash for the given byte slice.
+CrcHash calculates the CRC32 hash for the given byte slice.
 
 Parameters:
   - data: A byte slice for which the CRC32 hash is to be calculated.
@@ -66,7 +66,7 @@ Parameters:
 Returns:
   - uint32: The CRC32 hash value.
 */
-func crcHash(data []byte) uint32 {
+func CrcHash(data []byte) uint32 {
 	return crc32.ChecksumIEEE(data)
 }
 
