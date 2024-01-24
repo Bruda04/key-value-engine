@@ -1,17 +1,18 @@
-package main
+package skipList
 
 import (
+	"key-value-engine/structs/record"
 	"math/rand"
 )
 
 type Node struct {
-	value int
+	value *record.Record
 	next  []*Node
 }
 
-func newNode(value int, level int) *Node {
+func newNode(record *record.Record, level int) *Node {
 	return &Node{
-		value: value,
+		value: record,
 		next:  make([]*Node, level),
 	}
 }
@@ -30,17 +31,26 @@ Initialize Skip List
 func MakeSkipList(maxHeight int) *SkipList {
 	return &SkipList{
 		maxHeight: maxHeight,
-		head:      newNode(-1, maxHeight),
+		head:      newNode(nil, maxHeight),
 		height:    1,
 	}
 }
 
-func (s *SkipList) Insert(value int) {
+func (s *SkipList) Insert(val *record.Record) {
 	update := make([]*Node, s.maxHeight)
 	current := s.head
 
+	// Update/delete
+	exists, existingNode := s.FindNode(val.GetKey())
+
+	if exists {
+		// Replace the existing value with the new one
+		existingNode.value = val
+		return
+	}
+
 	for i := s.height - 1; i >= 0; i-- {
-		for current.next[i] != nil && current.next[i].value < value {
+		for current.next[i] != nil && current.next[i].value.GetKey() < val.GetKey() {
 			current = current.next[i]
 		}
 		update[i] = current
@@ -55,7 +65,7 @@ func (s *SkipList) Insert(value int) {
 		s.height = level
 	}
 
-	newNode := newNode(value, level)
+	newNode := newNode(val, level)
 
 	// updating pointers to include new addition
 	for i := 0; i < level; i++ {
@@ -65,35 +75,51 @@ func (s *SkipList) Insert(value int) {
 
 }
 
-func (s *SkipList) Search(value int) bool {
+func (s *SkipList) Find(key string) bool {
 	current := s.head
 
 	for i := s.height - 1; i >= 0; i-- {
-		for current.next[i] != nil && current.next[i].value < value {
+		for current.next[i] != nil && current.next[i].value.GetKey() < key {
 			current = current.next[i]
 		}
 	}
 
-	if current.next[0] != nil && current.next[0].value == value {
-		return true
+	if current.next[0] != nil && current.next[0].value.GetKey() == key {
+		return !current.next[0].value.IsTombstone() //current.next[0].value
 	}
 
 	return false
 }
 
-func (s *SkipList) Delete(value int) {
+func (s *SkipList) FindNode(key string) (bool, *Node) {
+	current := s.head
+
+	for i := s.height - 1; i >= 0; i-- {
+		for current.next[i] != nil && current.next[i].value.GetKey() < key {
+			current = current.next[i]
+		}
+	}
+
+	if current.next[0] != nil && current.next[0].value.GetKey() == key {
+		return true, current.next[0]
+	}
+
+	return false, nil
+}
+
+func (s *SkipList) Delete(key string) {
 	update := make([]*Node, s.maxHeight)
 	current := s.head
 
 	for i := s.height - 1; i >= 0; i-- {
-		for current.next[i] != nil && current.next[i].value < value {
+		for current.next[i] != nil && current.next[i].value.GetKey() < key {
 			current = current.next[i]
 		}
 		update[i] = current
 	}
 
 	target := current.next[0]
-	if target != nil && target.value == value {
+	if target != nil && target.value.GetKey() == key {
 		for i := 0; i < s.height; i++ {
 			if update[i].next[i] != target {
 				break
@@ -106,6 +132,18 @@ func (s *SkipList) Delete(value int) {
 			s.height--
 		}
 	}
+}
+
+func (s *SkipList) GetSortedList() []*record.Record {
+	var sortedList []*record.Record
+	current := s.head.next[0]
+
+	for current != nil {
+		sortedList = append(sortedList, current.value)
+		current = current.next[0]
+	}
+
+	return sortedList
 }
 
 func (s *SkipList) roll() int {
