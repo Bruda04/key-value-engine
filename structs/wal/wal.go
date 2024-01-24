@@ -1,244 +1,414 @@
-package wal
+package main
 
 import (
-	"errors"
+	"encoding/binary"
 	"fmt"
-	"io"
+	"github.com/edsrzf/mmap-go"
 	"key-value-engine/structs/record"
+	"log"
 	"os"
 )
 
 const (
-	// Temporary data path
-	DATA_PATH   = ".." + string(os.PathSeparator) + ".." + string(os.PathSeparator) + "data" + string(os.PathSeparator) + "wal"
-	PATH_PREFIX = DATA_PATH + string(os.PathSeparator) + "wal_"
+	DIRECTORY = "data" + string(os.PathSeparator) + "wal"
+	FILEPATH  = DIRECTORY + string(os.PathSeparator) + "wal"
+	EXT       = ".log"
 )
 
 type WAL struct {
-	SegmentSize   uint64           // User defined segment size in bytes (ex. 100)
-	LatestSegment []*record.Record // List of pointers to records
-	SegmentFiles  []string         // Segment filenames
+	SegmentSize     int64
+	SegmentFiles    []string
+	RepairFileIndex int64
+	RepairOffset    int64
 }
 
-/*
-MakeWAL initializes a new Write-Ahead Log (WAL) with the provided segment size.
-Parameters:
-
-	segmentSize: uint64 - The user-defined length in bytes for each segment of the WAL.
-
-Returns:
-
-	*WAL: Pointer to the initialized WAL.
-	error: An error if any occurred during the initialization process.
-*/
-func MakeWAL(segmentSize uint64) (*WAL, error) {
-	if _, err := os.Stat(DATA_PATH); os.IsNotExist(err) {
-		if err := os.MkdirAll(DATA_PATH, 0755); err != nil {
-			return nil, fmt.Errorf("error creating data directory: %s", err)
-		}
+func MakeWAL(segmentSize int64) (*WAL, error) {
+	if err := os.MkdirAll(DIRECTORY, 0755); err != nil {
+		return nil, fmt.Errorf("error creating data directory: %s", err)
 	}
 
-	initialSegmentFile := PATH_PREFIX + "_1.log"
+	initialSegmentFile := FILEPATH + "_1" + EXT
+
+	var filenames []string
 
 	if _, err := os.Stat(initialSegmentFile); err == nil {
-		if err := os.Remove(initialSegmentFile); err != nil {
-			return nil, fmt.Errorf("error removing existing initial segment file: %s", err)
+		dir, _ := os.Open(DIRECTORY)
+		files, _ := dir.Readdir(0)
+		for _, file := range files {
+			filenames = append(filenames, DIRECTORY+string(os.PathSeparator)+file.Name())
 		}
-	}
-
-	_, err := os.Create(initialSegmentFile)
-	if err != nil {
-		return nil, fmt.Errorf("error creating initial segment file: %s", err)
+	} else {
+		filenames = append(filenames, initialSegmentFile)
+		if err := createInitialSegmentFile(initialSegmentFile); err != nil {
+			return nil, fmt.Errorf("error creating initial segment file: %s", err)
+		}
 	}
 
 	wal := &WAL{
-		SegmentSize:   segmentSize,
-		SegmentFiles:  []string{initialSegmentFile},
-		LatestSegment: make([]*record.Record, 0),
+		SegmentSize:     segmentSize,
+		SegmentFiles:    filenames,
+		RepairFileIndex: 0,
+		RepairOffset:    8,
 	}
 
 	return wal, nil
 }
 
-/*
-AddRecord adds a new record to the Write-Ahead Log (WAL).
-Parameters:
+func createInitialSegmentFile(filename string) error {
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
 
-	key: string - The key associated with the record.
-	value: []byte - The value of the record.
-	deleted: bool - Whether the record is marked as deleted or not.
+		}
+	}(f)
 
-Returns:
+	overflowBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(overflowBytes, 0)
+	_, err = f.Write(overflowBytes)
 
-	error: An error if any occurred while adding the record.
-*/
+	return err
+}
+
 func (wal *WAL) AddRecord(key string, value []byte, deleted bool) error {
 	rec := record.MakeRecord(key, value, deleted)
-	recordSize := uint64(record.RECORD_HEADER_SIZE + rec.GetKeySize() + rec.GetValueSize())
+	recordBytes := rec.RecordToBytes()
 
-	totalSize := recordSize
-	for _, r := range wal.LatestSegment {
-		totalSize += uint64(record.RECORD_HEADER_SIZE + r.GetKeySize() + r.GetValueSize())
+	filePath := wal.SegmentFiles[len(wal.SegmentFiles)-1]
+
+	f, err := os.OpenFile(filePath, os.O_RDWR, 0644)
+	if err != nil {
+		return fmt.Errorf("error opening segment file for writing: %s", err)
 	}
-
-	wal.LatestSegment = append(wal.LatestSegment, rec)
-
-	if totalSize > wal.SegmentSize {
-		if err := wal.serializeSegment(); err != nil {
-			return fmt.Errorf("error writing segment: %s", err)
-		}
-	}
-	return nil
-}
-
-/*
-serializeSegment writes the records of the segment into a new segment file.
-Returns:
-
-	error: An error if any occurred during the serialization process.
-*/
-func (wal *WAL) serializeSegment() error {
-	// Ensure there is an active file
-	if len(wal.SegmentFiles) == 0 {
-		return errors.New("no active segment file")
-	}
-
-	// Iterate over all records in the segment
-	for _, rec := range wal.LatestSegment {
-		recordBytes := rec.RecordToBytes()
-
-		// Open the current segment file for writing
-		file, err := os.OpenFile(wal.SegmentFiles[len(wal.SegmentFiles)-1], os.O_APPEND|os.O_WRONLY, 0644)
+	defer func(f *os.File) {
+		err := f.Close()
 		if err != nil {
-			return fmt.Errorf("error opening segment file for writing: %s", err)
-		}
 
-		// Check if adding the current record exceeds the segment size
-		fileSize, err := file.Seek(0, io.SeekEnd)
+		}
+	}(f)
+
+	mmappedData, err := mmap.Map(f, mmap.RDWR, 0)
+	if err != nil {
+		return fmt.Errorf("error mmaping file: %s", err)
+	}
+	defer func(mmappedData *mmap.MMap) {
+		err := mmappedData.Unmap()
 		if err != nil {
-			file.Close()
-			return fmt.Errorf("error getting segment file size: %s", err)
+
 		}
+	}(&mmappedData)
 
-		// If adding the current record exceeds the segment size, split the record
-		if uint64(fileSize)+uint64(len(recordBytes)) > wal.SegmentSize {
+	fileSize := int64(len(mmappedData))
 
-			// Calculate how much of the record can fit in the current segment
-			bytesToFit := wal.SegmentSize - uint64(fileSize)
-			firstPart := recordBytes[:bytesToFit]
-			secondPart := recordBytes[bytesToFit:]
+	// In case of record overflowing
+	if fileSize+int64(len(recordBytes)) > wal.SegmentSize {
 
-			if _, err := file.Write(firstPart); err != nil {
-				file.Close()
-				return fmt.Errorf("error writing first part of record to segment file: %s", err)
-			}
-			file.Close()
+		bytesToFit := wal.SegmentSize - fileSize
+		firstRecordPart := recordBytes[:bytesToFit]
+		secondRecordPart := recordBytes[bytesToFit:]
 
-			// Create a new segment for the second part
-			wal.makeSegment()
-
-			// Open the new segment file for writing
-			file, err = os.OpenFile(wal.SegmentFiles[len(wal.SegmentFiles)-1], os.O_APPEND|os.O_WRONLY, 0644)
+		err := f.Truncate(fileSize + int64(len(firstRecordPart)))
+		if err != nil {
+			return err
+		}
+		mmapedDataExpanded, err := mmap.Map(f, mmap.RDWR, 0)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer func(mmapedDataExpanded *mmap.MMap) {
+			err := mmapedDataExpanded.Unmap()
 			if err != nil {
-				return fmt.Errorf("error opening new segment file for writing: %s", err)
-			}
 
-			// Write the second part to the new segment file
-			if _, err := file.Write(secondPart); err != nil {
-				file.Close()
-				return fmt.Errorf("error writing second part of record to new segment file: %s", err)
 			}
-			file.Close()
-		} else {
-			// If the record fits in the current segment, simply write it to the file
-			if _, err := file.Write(recordBytes); err != nil {
-				file.Close()
-				return fmt.Errorf("error writing record to segment file: %s", err)
-			}
-			file.Close()
+		}(&mmapedDataExpanded)
+		copy(mmapedDataExpanded[fileSize:], firstRecordPart)
+
+		err = wal.makeSegment()
+		if err != nil {
+			return err
 		}
+
+		secondFile, err := os.OpenFile(wal.SegmentFiles[len(wal.SegmentFiles)-1], os.O_RDWR, 0644)
+		if err != nil {
+			return fmt.Errorf("error opening new segment file for writing: %s", err)
+		}
+		defer func(secondFile *os.File) {
+			err := secondFile.Close()
+			if err != nil {
+
+			}
+		}(secondFile)
+
+		mmapedDataSecondFile, err := mmap.Map(secondFile, mmap.RDWR, 0)
+		if err != nil {
+			return fmt.Errorf("error mmaping new file: %s", err)
+		}
+		defer func(mmapedDataSecondFile *mmap.MMap) {
+			err := mmapedDataSecondFile.Unmap()
+			if err != nil {
+
+			}
+		}(&mmapedDataSecondFile)
+
+		secondRecordPartSize := uint64(len(secondRecordPart))
+		secondPartSizeBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(secondPartSizeBytes, secondRecordPartSize)
+
+		err = secondFile.Truncate(8 + int64(secondRecordPartSize))
+		if err != nil {
+			return err
+		}
+		mmappedDataSecondFileExplanded, err := mmap.Map(secondFile, mmap.RDWR, 0)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer func(mmappedDataSecondFileExplanded *mmap.MMap) {
+			err := mmappedDataSecondFileExplanded.Unmap()
+			if err != nil {
+
+			}
+		}(&mmappedDataSecondFileExplanded)
+		copy(mmappedDataSecondFileExplanded[:8], secondPartSizeBytes)
+		copy(mmappedDataSecondFileExplanded[8:], secondRecordPart)
+
+	} else {
+		err := f.Truncate(fileSize + int64(len(recordBytes)))
+		if err != nil {
+			return err
+		}
+		mmapedDataExpanded, err := mmap.Map(f, mmap.RDWR, 0)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer func(mmapedDataExpanded *mmap.MMap) {
+			err := mmapedDataExpanded.Unmap()
+			if err != nil {
+
+			}
+		}(&mmapedDataExpanded)
+		copy(mmapedDataExpanded[fileSize:], recordBytes)
 	}
 
 	return nil
 }
 
-/*
-makeSegment creates a new segment and appends it to the WAL's segments.
-*/
-func (wal *WAL) makeSegment() {
-	// Create a new segment file
-	newSegmentFile := PATH_PREFIX + fmt.Sprintf("_%d.log", len(wal.SegmentFiles)+1)
+func (wal *WAL) makeSegment() error {
+	newSegmentFile := FILEPATH + fmt.Sprintf("_%d.log", len(wal.SegmentFiles)+1)
 	wal.SegmentFiles = append(wal.SegmentFiles, newSegmentFile)
-
-	// Update the LatestSegment to an empty slice for the new segment
-	wal.LatestSegment = make([]*record.Record, 0)
 
 	// Create the new segment file
 	file, err := os.Create(newSegmentFile)
 	if err != nil {
-		fmt.Printf("Error creating new segment file: %s\n", err)
-		return
+		return fmt.Errorf("error creating new segment file: %s\n", err)
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
+
+	leftover := make([]byte, 8)
+	binary.LittleEndian.PutUint64(leftover, 0)
+	_, err = file.Write(leftover)
+	if err != nil {
+		return fmt.Errorf("error writing overflow record part length to file: %s", err)
+	}
+	return nil
 }
 
-// Potential deserialization implementation (doesn't work)
-//func (wal *WAL) deserializeSegment(segmentFile string) ([]*Record, error) {
-//	file, err := os.Open(segmentFile)
-//	if err != nil {
-//		return nil, fmt.Errorf("error opening segment file for reading: %s", err)
-//	}
-//	defer file.Close()
-//
-//	var records []*Record
-//
-//	for {
-//		recordBytes, err := readBytesFromFile(file, RECORD_HEADER_SIZE)
-//		if err != nil {
-//			if err == io.EOF {
-//				break // End of file
-//			}
-//			return nil, fmt.Errorf("error reading record header: %s", err)
-//		}
-//
-//		record := BytesToRecord(recordBytes)
-//		// Read key and value for the record
-//		keyAndValueBytes, err := readBytesFromFile(file, uint64(record.GetKeySize()+uint64(len(record.GetValue()))))
-//		if err != nil {
-//			return nil, fmt.Errorf("error reading key and value for record: %s", err)
-//		}
-//
-//		// Update key and value for the record
-//		record.key = string(keyAndValueBytes[:record.GetKeySize()])
-//		record.value = keyAndValueBytes[record.GetKeySize():]
-//
-//		records = append(records, record)
-//	}
-//
-//	return records, nil
-//}
-//
-//func (wal *WAL) loadSegments() error {
-//	for _, segmentFile := range wal.SegmentFiles {
-//		records, err := wal.deserializeSegment(segmentFile)
-//		if err != nil {
-//			return fmt.Errorf("error loading segment %s: %s", segmentFile, err)
-//		}
-//
-//		wal.LatestSegment = append(wal.LatestSegment, records...)
-//	}
-//
-//	return nil
-//}
-//
-//func readBytesFromFile(file *os.File, size uint64) ([]byte, error) {
-//	data := make([]byte, size)
-//	n, err := file.Read(data)
-//	if err != nil {
-//		return nil, fmt.Errorf("error reading from file: %s", err)
-//	}
-//	if uint64(n) != size {
-//		return nil, fmt.Errorf("unexpected number of bytes read from file")
-//	}
-//	return data, nil
-//}
+func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
+	if offset != -1 {
+		wal.RepairOffset = offset
+	}
+	f, err := os.OpenFile(wal.SegmentFiles[wal.RepairFileIndex], os.O_RDWR, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("error opening new segment file for writing: %s", err)
+	}
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+
+		}
+	}(f)
+
+	mmappedData, err := mmap.Map(f, mmap.RDWR, 0)
+	if err != nil {
+		return nil, fmt.Errorf("error mmaping new file: %s", err)
+	}
+	defer func(mmappedData *mmap.MMap) {
+		err := mmappedData.Unmap()
+		if err != nil {
+
+		}
+	}(&mmappedData)
+
+	leftoverSpace := wal.SegmentSize - wal.RepairOffset
+
+	if leftoverSpace < record.RECORD_HEADER_SIZE {
+		recordFirstPartBytes := make([]byte, leftoverSpace)
+		copy(recordFirstPartBytes, mmappedData[wal.RepairOffset:])
+
+		if wal.RepairFileIndex == int64(len(wal.SegmentFiles)-1) {
+			return nil, fmt.Errorf("not enough segment files: %s", err)
+		}
+
+		wal.RepairFileIndex++
+		wal.RepairOffset = 0
+
+		secondFile, err := os.OpenFile(wal.SegmentFiles[wal.RepairFileIndex], os.O_RDWR, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("error opening new segment file for writing: %s", err)
+		}
+		defer func(secondFile *os.File) {
+			err := secondFile.Close()
+			if err != nil {
+
+			}
+		}(secondFile)
+
+		mmapedDataSecondFile, err := mmap.Map(secondFile, mmap.RDWR, 0)
+		if err != nil {
+			return nil, fmt.Errorf("error mmaping new file: %s", err)
+		}
+		defer func(mmapedDataSecondFile *mmap.MMap) {
+			err := mmapedDataSecondFile.Unmap()
+			if err != nil {
+
+			}
+		}(&mmapedDataSecondFile)
+
+		leftoverRecSizeBytes := make([]byte, 8)
+		copy(leftoverRecSizeBytes, mmapedDataSecondFile[:8])
+		leftoverRecSize := binary.LittleEndian.Uint64(leftoverRecSizeBytes)
+
+		wal.RepairOffset += 8
+
+		recSecondPartBytes := make([]byte, leftoverRecSize)
+		copy(recSecondPartBytes, mmapedDataSecondFile[8:8+leftoverRecSize])
+
+		wal.RepairOffset += int64(leftoverRecSize)
+
+		recBytes := append(recordFirstPartBytes, recSecondPartBytes...)
+		rec := record.BytesToRecord(recBytes)
+
+		if record.CrcHash(rec.GetValue()) != rec.GetCrc() {
+			return nil, fmt.Errorf("crc does not match the hashed value: %s", err)
+		}
+
+		return rec, nil
+
+	}
+
+	recHeader := make([]byte, record.RECORD_HEADER_SIZE)
+	copy(recHeader, mmappedData[wal.RepairOffset:wal.RepairOffset+record.RECORD_HEADER_SIZE])
+
+	recSize := record.Size(recHeader)
+
+	if int64(recSize) > leftoverSpace {
+		recordFirstPartBytes := make([]byte, leftoverSpace)
+		copy(recordFirstPartBytes, mmappedData[wal.RepairOffset:])
+
+		if wal.RepairFileIndex == int64(len(wal.SegmentFiles)-1) {
+			return nil, fmt.Errorf("not enough segment files: %s", err)
+		}
+
+		wal.RepairFileIndex++
+		wal.RepairOffset = 0
+
+		secondFile, err := os.OpenFile(wal.SegmentFiles[wal.RepairFileIndex], os.O_RDWR, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("error opening new segment file for writing: %s", err)
+		}
+		defer func(secondFile *os.File) {
+			err := secondFile.Close()
+			if err != nil {
+
+			}
+		}(secondFile)
+
+		mmapedDataSecondFile, err := mmap.Map(secondFile, mmap.RDWR, 0)
+		if err != nil {
+			return nil, fmt.Errorf("error mmaping new file: %s", err)
+		}
+		defer func(mmapedDataSecondFile *mmap.MMap) {
+			err := mmapedDataSecondFile.Unmap()
+			if err != nil {
+
+			}
+		}(&mmapedDataSecondFile)
+
+		leftoverRecSizeBytes := make([]byte, 8)
+		copy(leftoverRecSizeBytes, mmapedDataSecondFile[:8])
+		leftoverRecSize := binary.LittleEndian.Uint64(leftoverRecSizeBytes)
+
+		wal.RepairOffset += 8
+
+		recSecondPartBytes := make([]byte, leftoverRecSize)
+		copy(recSecondPartBytes, mmapedDataSecondFile[8:8+leftoverRecSize])
+
+		wal.RepairOffset += int64(leftoverRecSize)
+
+		recBytes := append(recordFirstPartBytes, recSecondPartBytes...)
+		rec := record.BytesToRecord(recBytes)
+
+		if record.CrcHash(rec.GetValue()) != rec.GetCrc() {
+			return nil, fmt.Errorf("crc does not match the hashed value: %s", err)
+		}
+
+		return rec, nil
+	}
+
+	recBytes := make([]byte, recSize)
+	copy(recBytes, mmappedData[wal.RepairOffset:wal.RepairOffset+int64(recSize)])
+
+	wal.RepairOffset += int64(recSize)
+
+	rec := record.BytesToRecord(recBytes)
+
+	if record.CrcHash(rec.GetValue()) != rec.GetCrc() {
+		return nil, fmt.Errorf("error opening new segment file for writing: %s", err)
+	}
+
+	return rec, nil
+}
+
+func (wal *WAL) deleteLWM(lwm uint64) {
+	toDelte := make([]string, lwm)
+	copy(toDelte, wal.SegmentFiles[:lwm])
+
+	wal.SegmentFiles = wal.SegmentFiles[lwm:]
+
+	for i := 0; i < len(toDelte); i++ {
+		err := os.Remove(toDelte[i])
+
+		if err != nil {
+			fmt.Println("Error deleting file:", err)
+			return
+		}
+	}
+
+	wal.renameSegments()
+
+}
+
+func (wal *WAL) renameSegments() {
+
+	for i := 0; i < len(wal.SegmentFiles); i++ {
+		oldName := wal.SegmentFiles[i]
+		newName := fmt.Sprintf("%s_%d.log", FILEPATH, i+1)
+
+		err := os.Rename(oldName, newName)
+		wal.SegmentFiles[i] = newName
+
+		if err != nil {
+			fmt.Println("Error renaming file:", err)
+			return
+		}
+
+	}
+
+}
