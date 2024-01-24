@@ -41,9 +41,8 @@ Parameters:
 
 Returns:
   - bool: True if the key is found; otherwise, false.
-  - *Record: Pointer to the associated Record if found; otherwise, nil.
 */
-func (bt *BTree) Find(recKey string) (bool, *record.Record) {
+func (bt *BTree) Find(recKey string) bool {
 	tmpNode := bt.root
 
 	for {
@@ -53,9 +52,9 @@ func (bt *BTree) Find(recKey string) (bool, *record.Record) {
 		}
 
 		if i < len(tmpNode.keys) && recKey == tmpNode.keys[i].GetKey() {
-			return true, tmpNode.keys[i]
+			return !tmpNode.keys[i].IsTombstone()
 		} else if tmpNode.leaf {
-			return false, nil
+			return false
 		} else {
 			tmpNode = tmpNode.children[i]
 		}
@@ -72,6 +71,10 @@ Parameters:
   - rec: Pointer to a Record, representing the key to be inserted.
 */
 func (bt *BTree) Insert(rec *record.Record) {
+	if bt.tryUpdate(rec) {
+		return
+	}
+
 	node := bt.root
 	if node.isFull() {
 		newRoot := makebTreeNode(false, bt.m)
@@ -115,4 +118,94 @@ func (bt *BTree) insertNonFull(n *bTreeNode, rec *record.Record) {
 		}
 	}
 	n.insertKey(rec)
+}
+
+/*
+tryUpdate attempts to update a Record in the B-tree with the given key.
+
+Receiver:
+  - bt: Pointer to a BTree, representing the B-tree.
+
+Parameters:
+  - rec: Pointer to a Record, representing the key to be updated.
+
+Returns:
+  - bool: True if the update is successful; otherwise, false.
+
+Implementation Details:
+
+	The function searches for the key in the B-tree and attempts to update the associated
+	Record with the provided Record. If the key is found, the associated Record is updated,
+	and the function returns true. If the key is not found, the function returns false.
+*/
+func (bt *BTree) tryUpdate(rec *record.Record) bool {
+	recKey := rec.GetKey()
+	tmpNode := bt.root
+
+	for {
+		i := 0
+		for i < len(tmpNode.keys) && recKey > tmpNode.keys[i].GetKey() {
+			i++
+		}
+
+		if i < len(tmpNode.keys) && recKey == tmpNode.keys[i].GetKey() {
+			tmpNode.keys[i] = rec
+			return true
+		} else if tmpNode.leaf {
+			return false
+		} else {
+			tmpNode = tmpNode.children[i]
+		}
+	}
+}
+
+/*
+GetSorted returns a sorted slice of Records from the B-tree.
+
+Receiver:
+  - bt: Pointer to a BTree, representing the B-tree.
+
+Returns:
+  - []*Record: A sorted slice of Records.
+*/
+func (bt *BTree) GetSorted() []*record.Record {
+	ret := make([]*record.Record, 0)
+	ret = bt.innerSorted(nil, ret)
+
+	return ret
+}
+
+/*
+innerSorted recursively traverses the B-tree in sorted order and appends Records
+to the provided slice.
+
+Receiver:
+  - bt: Pointer to a BTree, representing the B-tree.
+
+Parameters:
+  - n: Pointer to a bTreeNode, representing the current node in traversal.
+  - slice: A slice of Records to which the sorted Records are appended.
+
+Returns:
+  - []*Record: The updated slice containing sorted Records.
+*/
+func (bt *BTree) innerSorted(n *bTreeNode, slice []*record.Record) []*record.Record {
+	if n == nil {
+		n = bt.root
+	}
+
+	if n.leaf {
+		for i := 0; i < len(n.keys); i++ {
+			slice = append(slice, n.keys[i])
+		}
+	}
+
+	for i := 0; i < len(n.children); i++ {
+		slice = bt.innerSorted(n.children[i], slice)
+		if i < len(n.keys) {
+			slice = append(slice, n.keys[i])
+		}
+	}
+
+	return slice
 }
