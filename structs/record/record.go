@@ -201,3 +201,81 @@ func (r *Record) PrintRecord() {
 	fmt.Printf("Key: %s\n", r.key)
 	fmt.Printf("Value: %v\n", r.value)
 }
+
+/*
+SSTRecordToBytes converts a Record instance to a byte slice for an SST (Sorted String Table) file.
+
+Returns:
+  - []byte: A byte slice representing the serialized form of the Record.
+
+The function distinguishes between regular records and tombstone records.
+If the record is not a tombstone, it delegates the conversion to the RecordToBytes function.
+*/
+func (r *Record) SSTRecordToBytes() []byte {
+	if !r.tombstone {
+		return r.RecordToBytes()
+	}
+
+	crcBytes := make([]byte, CRC_SIZE)
+	binary.LittleEndian.PutUint32(crcBytes, r.crc)
+
+	timestampBytes := make([]byte, TIMESTAMP_SIZE)
+	binary.LittleEndian.PutUint64(timestampBytes, r.timestamp)
+
+	tombstoneBytes := []byte{0}
+	if r.tombstone {
+		tombstoneBytes[0] = 1
+	}
+
+	keySizeBytes := make([]byte, KEY_SIZE_SIZE)
+	binary.LittleEndian.PutUint64(keySizeBytes, r.keySize)
+
+	keyBytes := []byte(r.key)
+
+	result := append(crcBytes, timestampBytes...)
+	result = append(result, tombstoneBytes...)
+	result = append(result, keySizeBytes...)
+	result = append(result, keyBytes...)
+
+	return result
+}
+
+/*
+SSTBytesToRecord converts a byte slice to a Record instance for an SST file.
+
+Parameters:
+  - bytes: A byte slice representing the serialized form of the Record.
+
+Returns:
+  - *Record: Pointer to a Record instance initialized with the data from the byte slice.
+
+The function distinguishes between regular records and tombstone records by checking
+the value at the TOMBSTONE_START position in the byte slice. If it's 1, indicating a tombstone,
+it creates a Record instance with tombstone information, otherwise, it delegates the conversion
+to the BytesToRecord function.
+*/
+func SSTBytesToRecord(bytes []byte) *Record {
+	tombstone := bytes[TOMBSTONE_START] == 1
+
+	if !tombstone {
+		return BytesToRecord(bytes)
+	}
+
+	r := Record{}
+
+	r.tombstone = tombstone
+
+	r.crc = binary.LittleEndian.Uint32(bytes[CRC_START:TIMESTAMP_START])
+
+	r.timestamp = binary.LittleEndian.Uint64(bytes[TIMESTAMP_START:TOMBSTONE_START])
+
+	r.keySize = binary.LittleEndian.Uint64(bytes[KEY_SIZE_START:VALUE_SIZE_START])
+
+	r.valueSize = 0
+
+	r.key = string(bytes[VALUE_SIZE_START : VALUE_SIZE_START+r.keySize])
+
+	r.value = make([]byte, 0)
+
+	return &r
+}
