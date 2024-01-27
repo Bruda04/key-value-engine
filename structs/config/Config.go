@@ -25,7 +25,7 @@ type Config struct {
 	MemtableStructure   string `json:"memtable_structure"`
 	BTreeDegree         uint64 `json:"btree_degree"`
 	SkipListMaxHeight   uint64 `json:"skip_list_max_height"`
-	CacheSize           uint64 `json:"cahce_size"`
+	CacheSize           uint64 `json:"cache_size"`
 	SummaryIndexDensity uint64 `json:"summary_index_density"`
 }
 

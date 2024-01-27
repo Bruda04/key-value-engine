@@ -4,6 +4,6 @@
   "memtable_structure": "btree",
   "btree_degree": 4,
   "skip_list_max_height": 32,
-  "cahce_size": 5,
+  "cache_size": 5,
   "summary_index_density": 5
 }
