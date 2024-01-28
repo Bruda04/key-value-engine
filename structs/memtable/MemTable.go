@@ -15,6 +15,7 @@ type MemTable struct {
 	hashMap     map[string]*record.Record
 }
 
+// In case of incorrectly passed values creates default memtable/*
 func MakeDefaultMemtable() (mem *MemTable) {
 	return &MemTable{
 		maxCapacity: 100,
@@ -22,10 +23,24 @@ func MakeDefaultMemtable() (mem *MemTable) {
 		structType:  "skiplist",
 		bTree:       nil,
 		skipList:    skipList.MakeSkipList(100),
+		hashMap:     nil,
 	}
 }
 
+/*
+Initialize Memtable
+
+	-how many elements we want each table to contain
+	-structures to be used for implementation
+		-btree
+		-skiplist
+		-hashmap
+*/
 func MakeMemTable(maxCapacity int, structType string) *MemTable {
+	if maxCapacity <= 0 {
+		return MakeDefaultMemtable()
+	}
+
 	if structType == "btree" {
 		bTree, _ := btree.MakeBTree(maxCapacity)
 		return &MemTable{
@@ -34,6 +49,7 @@ func MakeMemTable(maxCapacity int, structType string) *MemTable {
 			structType:  structType,
 			bTree:       bTree,
 			skipList:    nil,
+			hashMap:     nil,
 		}
 	} else if structType == "skiplist" {
 		return &MemTable{
@@ -42,6 +58,7 @@ func MakeMemTable(maxCapacity int, structType string) *MemTable {
 			structType:  structType,
 			bTree:       nil,
 			skipList:    skipList.MakeSkipList(maxCapacity),
+			hashMap:     nil,
 		}
 	} else if structType == "hashmap" {
 		return &MemTable{
@@ -50,9 +67,10 @@ func MakeMemTable(maxCapacity int, structType string) *MemTable {
 			structType:  structType,
 			bTree:       nil,
 			skipList:    nil,
+			hashMap:     nil,
 		}
 	} else {
-		panic("Invalid structType!")
+		return MakeDefaultMemtable()
 	}
 }
 
@@ -62,7 +80,7 @@ func (mem *MemTable) Clear() {
 	} else if mem.structType == "skiplist" {
 		mem.skipList = nil
 	} else if mem.structType == "hashmap" {
-		mem.hashMap = make(map[string]*record.Record)
+		mem.hashMap = nil
 	}
 
 	mem.capacity = 0
@@ -79,6 +97,7 @@ func (mem *MemTable) Find(key string) bool {
 	}
 }
 
+// Supports replace
 func (mem *MemTable) Put(rec *record.Record) {
 	if mem.structType == "btree" {
 		mem.bTree.Insert(rec)
@@ -89,12 +108,11 @@ func (mem *MemTable) Put(rec *record.Record) {
 	}
 
 	mem.capacity += 1
-
-	if mem.capacity >= mem.maxCapacity {
-		mem.FlushMem()
-	}
 }
 
-func (mem *MemTable) FlushMem() {
-	mem.capacity = 0
+func (mem *MemTable) isEmpty() bool {
+	if mem.bTree == nil && mem.hashMap == nil && mem.skipList == nil {
+		return true
+	}
+	return false
 }
