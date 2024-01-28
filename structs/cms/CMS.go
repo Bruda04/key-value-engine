@@ -1,12 +1,29 @@
 package cms
 
-import "math"
+import (
+	"encoding/binary"
+	"errors"
+	"math"
+)
 
 type CMS struct {
-	k, m          uint
+	k, m          uint64
 	data          [][]uint64
 	hashFunctions []hashWithSeed
 }
+
+const (
+	K_SIZE         = 8
+	M_SIZE         = 8
+	HASH_FUNC_SIZE = 8
+	SEED_SIZE      = 8
+
+	K_START         = 0
+	M_START         = K_START + K_SIZE
+	HASH_FUNC_START = M_START + M_SIZE
+	DATA_START_CMS  = HASH_FUNC_START + HASH_FUNC_SIZE
+	CMS_HEADER_SIZE = K_SIZE + M_SIZE + HASH_FUNC_SIZE
+)
 
 /*
 MakeCMS creates a Count-Min Sketch (CMS) data structure with specified parameters.
@@ -28,8 +45,8 @@ func MakeCMS(epsilon float64, delta float64) *CMS {
 	hfs := createHashFunctions(k)
 
 	return &CMS{
-		k:             k,
-		m:             m,
+		k:             uint64(k),
+		m:             uint64(m),
 		data:          data,
 		hashFunctions: hfs,
 	}
@@ -72,4 +89,83 @@ func (cms *CMS) Estimate(element []byte) uint64 {
 	}
 
 	return minVal
+}
+
+func (cms *CMS) CMSToBytes() []byte {
+	kBytes := make([]byte, K_SIZE)
+	binary.LittleEndian.PutUint64(kBytes, cms.k)
+
+	mBytes := make([]byte, M_SIZE)
+	binary.LittleEndian.PutUint64(mBytes, cms.m)
+
+	var hashFuncBytes []byte
+	for _, hf := range cms.hashFunctions {
+		seedSizeBytes := make([]byte, SEED_SIZE)
+		binary.LittleEndian.PutUint64(seedSizeBytes, uint64(len(hf.Seed)))
+		hashFuncBytes = append(hashFuncBytes, seedSizeBytes...)
+		hashFuncBytes = append(hashFuncBytes, hf.Seed...)
+	}
+
+	var dataBytes []byte
+	for _, row := range cms.data {
+		for _, value := range row {
+			valueBytes := make([]byte, 8)
+			binary.LittleEndian.PutUint64(valueBytes, value)
+			dataBytes = append(dataBytes, valueBytes...)
+		}
+	}
+
+	result := append(kBytes, mBytes...)
+	result = append(result, hashFuncBytes...)
+	result = append(result, dataBytes...)
+
+	return result
+}
+
+func BytesToCMS(data []byte) (*CMS, error) {
+	if len(data) < CMS_HEADER_SIZE {
+		return nil, errors.New("insufficient data for CMS header")
+	}
+
+	k := binary.LittleEndian.Uint64(data[K_START:M_START])
+	m := binary.LittleEndian.Uint64(data[M_START:HASH_FUNC_START])
+
+	if len(data) < int(CMS_HEADER_SIZE) {
+		return nil, errors.New("insufficient data for CMS payload")
+	}
+
+	var hashFunctions []hashWithSeed
+	index := HASH_FUNC_START
+	for i := 0; i < int(k); i++ {
+		seedSize := binary.LittleEndian.Uint64(data[index : index+SEED_SIZE])
+		index += SEED_SIZE
+		seed := data[index : index+int(seedSize)]
+		index += int(seedSize)
+
+		hashFunctions = append(hashFunctions, hashWithSeed{Seed: seed})
+	}
+
+	// Initialize the 2D data slice
+	dataSlice := make([][]uint64, k)
+	for i := range dataSlice {
+		dataSlice[i] = make([]uint64, m)
+	}
+
+	// Populate the 2D data slice with values
+	for i := 0; i < int(k); i++ {
+		for j := 0; j < int(m); j++ {
+			value := binary.LittleEndian.Uint64(data[index : index+8])
+			index += 8
+			dataSlice[i][j] = value
+		}
+	}
+
+	cms := &CMS{
+		k:             k,
+		m:             m,
+		hashFunctions: hashFunctions,
+		data:          dataSlice,
+	}
+
+	return cms, nil
 }
