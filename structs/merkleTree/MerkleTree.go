@@ -36,16 +36,18 @@ func MakeMerkleTree(dataBlock [][]byte) *MerkleTree {
 		treeNodes = append(treeNodes, NewLeafNode(value))
 	}
 
+	if (len(treeNodes) & (len(treeNodes) - 1)) != 0 {
+		for (len(treeNodes) & (len(treeNodes) - 1)) != 0 {
+			treeNodes = append(treeNodes, EmptyLeafNode())
+		}
+	}
+
 	for len(treeNodes) > 1 {
 		var newTreeNodes []*Node
 		for i := 0; i < len(treeNodes); i += 2 {
-			if i+1 < len(treeNodes) {
-				parentNode := AddNode(treeNodes[i], treeNodes[i+1])
-				newTreeNodes = append(newTreeNodes, parentNode)
-			} else {
-				parentNode := AddNode(treeNodes[i], nil)
-				newTreeNodes = append(newTreeNodes, parentNode)
-			}
+			parentNode := AddNode(treeNodes[i], treeNodes[i+1])
+			newTreeNodes = append(newTreeNodes, parentNode)
+
 		}
 		treeNodes = newTreeNodes
 	}
@@ -69,6 +71,14 @@ func NewLeafNode(data []byte) *Node {
 	hashedData := Hash(data)
 	return &Node{
 		data:  hashedData,
+		left:  nil,
+		right: nil,
+	}
+}
+
+func EmptyLeafNode() *Node {
+	return &Node{
+		data:  make([]byte, HASHVALUESIZE),
 		left:  nil,
 		right: nil,
 	}
