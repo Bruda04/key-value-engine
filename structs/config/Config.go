@@ -18,6 +18,9 @@ const (
 	DEFAULT_CACHESIZE           = 5
 	DEFAULT_SUMMARYINDEXDENSITY = 5
 	DEFAULT_DO_COMPRESSION      = false
+	DEFAULT_MAXLSMLEVELS        = 10
+	DEFAULT_TABLESTOCOMPRESS    = 5
+	DEFAULT_COMPRESSIONTYPE     = "size-tiered"
 )
 
 type Config struct {
@@ -29,6 +32,9 @@ type Config struct {
 	CacheSize           uint64 `json:"cahce_size"`
 	SummaryIndexDensity uint64 `json:"summary_index_density"`
 	Compress            bool   `json:"do_compression"`
+	CompressionType     string `json:"compression_tyoe"`
+	MaxLsmLevels        uint64 `json:"max_lsm_levels"`
+	TablesToCompress    uint64 `json:"tables_to_compress"`
 }
 
 func MakeConfig() (*Config, error) {
@@ -43,6 +49,9 @@ func MakeConfig() (*Config, error) {
 		CacheSize:           DEFAULT_CACHESIZE,
 		SummaryIndexDensity: DEFAULT_SUMMARYINDEXDENSITY,
 		Compress:            DEFAULT_DO_COMPRESSION,
+		CompressionType:     DEFAULT_COMPRESSIONTYPE,
+		MaxLsmLevels:        DEFAULT_MAXLSMLEVELS,
+		TablesToCompress:    DEFAULT_TABLESTOCOMPRESS,
 	}
 
 	if _, err := os.Stat(CONFIG_DIR); os.IsNotExist(err) {
@@ -106,6 +115,18 @@ func (cfg *Config) validate() {
 
 	if cfg.SummaryIndexDensity < 2 {
 		cfg.SummaryIndexDensity = DEFAULT_SUMMARYINDEXDENSITY
+	}
+
+	if cfg.CompressionType != "size-tiered" && cfg.CompressionType != "leveled" {
+		cfg.CompressionType = DEFAULT_COMPRESSIONTYPE
+	}
+
+	if cfg.MaxLsmLevels < 2 || cfg.MaxLsmLevels > 20 {
+		cfg.MaxLsmLevels = DEFAULT_MAXLSMLEVELS
+	}
+
+	if cfg.TablesToCompress < 2 || cfg.TablesToCompress > 8 {
+		cfg.TablesToCompress = DEFAULT_TABLESTOCOMPRESS
 	}
 }
 
