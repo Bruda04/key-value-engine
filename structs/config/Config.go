@@ -13,10 +13,11 @@ const (
 	DEFAULT_WALSIZE             = 20
 	DEFAULT_MEMTABLESIZE        = 20
 	DEFAULT_MEMTABLESTRUCT      = "btree"
-	DEFAULT_SKIPLISTMAXHEIGHT   = 32
+	DEFAULT_SKIPLISTMAXHEIGHT   = 20
 	DEFAULT_BTREEDEGREE         = 4
 	DEFAULT_CACHESIZE           = 5
 	DEFAULT_SUMMARYINDEXDENSITY = 5
+	DEFAULT_DO_COMPRESSION      = false
 )
 
 type Config struct {
@@ -25,18 +26,11 @@ type Config struct {
 	MemtableStructure   string `json:"memtable_structure"`
 	BTreeDegree         uint64 `json:"btree_degree"`
 	SkipListMaxHeight   uint64 `json:"skip_list_max_height"`
-	CacheSize           uint64 `json:"cache_size"`
+	CacheSize           uint64 `json:"cahce_size"`
 	SummaryIndexDensity uint64 `json:"summary_index_density"`
+	Compress            bool   `json:"do_compression"`
 }
 
-/*
-MakeConfig creates a new Config instance with default values or loads an existing
-configuration from a file. The function performs the following steps:
-
-Returns:
-  - *Config: Pointer to the Config instance representing the configuration.
-  - error: An error, if any, encountered during the process.
-*/
 func MakeConfig() (*Config, error) {
 	var cfg Config
 
@@ -48,6 +42,7 @@ func MakeConfig() (*Config, error) {
 		SkipListMaxHeight:   DEFAULT_SKIPLISTMAXHEIGHT,
 		CacheSize:           DEFAULT_CACHESIZE,
 		SummaryIndexDensity: DEFAULT_SUMMARYINDEXDENSITY,
+		Compress:            DEFAULT_DO_COMPRESSION,
 	}
 
 	if _, err := os.Stat(CONFIG_DIR); os.IsNotExist(err) {
@@ -56,7 +51,7 @@ func MakeConfig() (*Config, error) {
 		}
 	}
 
-	if _, err := os.Stat(CONFIG_PATH); os.IsExist(err) {
+	if _, err := os.Stat(CONFIG_PATH); !os.IsNotExist(err) {
 		configData, err := os.ReadFile(CONFIG_PATH)
 		if err != nil {
 			return &cfg, fmt.Errorf("error reading file: %s", err)
@@ -64,6 +59,10 @@ func MakeConfig() (*Config, error) {
 
 		err = json.Unmarshal(configData, &cfg)
 		if err != nil {
+			err := cfg.writeConfig()
+			if err != nil {
+				return &cfg, err
+			}
 			return &cfg, fmt.Errorf("error converting json to config: %s", err)
 		}
 
@@ -71,26 +70,15 @@ func MakeConfig() (*Config, error) {
 
 	}
 
-	// Marshal the modified config back to JSON
-	marshalled, err := json.MarshalIndent(cfg, "", "  ")
+	err := cfg.writeConfig()
 	if err != nil {
-		return &cfg, fmt.Errorf("error converting config to json: %s", err)
-
-	}
-
-	// Write the JSON data to the file
-	err = os.WriteFile(CONFIG_PATH, marshalled, 0644)
-	if err != nil {
-		return &cfg, fmt.Errorf("error writing config to file: %s", err)
+		return nil, err
 	}
 
 	return &cfg, nil
+
 }
 
-/*
-validate performs validation on the given Config object and adjusts
-any invalid or missing values to their default counterparts.
-*/
 func (cfg *Config) validate() {
 	if cfg.WalSize < 0 {
 		cfg.WalSize = DEFAULT_WALSIZE
@@ -108,7 +96,7 @@ func (cfg *Config) validate() {
 		cfg.BTreeDegree = DEFAULT_BTREEDEGREE
 	}
 
-	if cfg.SkipListMaxHeight < 32 {
+	if cfg.SkipListMaxHeight < 16 || cfg.SkipListMaxHeight > 32 {
 		cfg.SkipListMaxHeight = DEFAULT_SKIPLISTMAXHEIGHT
 	}
 
@@ -119,4 +107,21 @@ func (cfg *Config) validate() {
 	if cfg.SummaryIndexDensity < 2 {
 		cfg.SummaryIndexDensity = DEFAULT_SUMMARYINDEXDENSITY
 	}
+}
+
+func (cfg *Config) writeConfig() error {
+	// Marshal the modified config back to JSON
+	marshalled, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error converting config to json: %s", err)
+
+	}
+
+	// Write the JSON data to the file
+	err = os.WriteFile(CONFIG_PATH, marshalled, 0644)
+	if err != nil {
+		return fmt.Errorf("error writing config to file: %s", err)
+	}
+
+	return nil
 }

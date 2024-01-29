@@ -3,7 +3,8 @@
   "memtable_size": 20,
   "memtable_structure": "btree",
   "btree_degree": 4,
-  "skip_list_max_height": 32,
-  "cache_size": 5,
-  "summary_index_density": 5
+  "skip_list_max_height": 20,
+  "cahce_size": 5,
+  "summary_index_density": 5,
+  "do_compression": false
 }
