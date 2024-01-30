@@ -10,7 +10,7 @@ import (
 	"os"
 )
 
-func (sst *SSTable) makeMultipleFiles(data []*record.Record, dirPath string) error {
+func (sst *SSTable) makeMultipleFilesComp(data []*record.Record, dirPath string) error {
 	fileData, err := os.Create(dirPath + string(os.PathSeparator) + DATANAME)
 	if err != nil {
 		return err
@@ -80,8 +80,15 @@ func (sst *SSTable) makeMultipleFiles(data []*record.Record, dirPath string) err
 	merkleData := make([][]byte, len(data))
 	for i, rec := range data {
 		// Making Data
-		sstEntry := rec.RecordToBytes()
-		_, err := fileData.Write(sstEntry)
+		sstEntry := rec.SSTRecordToBytes()
+		entrySerSizeBytes := make([]byte, binary.MaxVarintLen64)
+		entrySizeLen := binary.PutUvarint(entrySerSizeBytes, uint64(len(sstEntry)))
+
+		_, err := fileData.Write(entrySerSizeBytes[:entrySizeLen])
+		if err != nil {
+			return fmt.Errorf("error writing record: %s\n", err)
+		}
+		_, err = fileData.Write(sstEntry)
 		if err != nil {
 			return fmt.Errorf("error writing record: %s\n", err)
 		}
@@ -95,7 +102,7 @@ func (sst *SSTable) makeMultipleFiles(data []*record.Record, dirPath string) err
 		}
 
 		// updating offset
-		offsetIndex += len(sstEntry)
+		offsetIndex += len(sstEntry) + entrySizeLen
 
 		// Making Summary
 		if i%sst.summaryFactor == 0 {
@@ -123,14 +130,14 @@ func (sst *SSTable) makeMultipleFiles(data []*record.Record, dirPath string) err
 	}
 
 	// making merkle
-	merkleT := merkleTree.MakeMerkleTree(merkleData)
-	merkleTBytes, err := merkleTree.SerializeMerkleTree(merkleT)
+	mt := merkleTree.MakeMerkleTree(merkleData)
+	mtBytes, err := merkleTree.SerializeMerkleTree(mt)
 	if err != nil {
 		return fmt.Errorf("error serializing merkle tree: %s\n", err)
 	}
 
 	// writting merkle
-	_, err = fileMerkle.Write(merkleTBytes)
+	_, err = fileMerkle.Write(mtBytes)
 	if err != nil {
 		return fmt.Errorf("error writing bloom filter to Filter: %s\n", err)
 	}
@@ -138,11 +145,11 @@ func (sst *SSTable) makeMultipleFiles(data []*record.Record, dirPath string) err
 	return nil
 }
 
-func (sst *SSTable) checkMultiple(key string, dirPath string) (*record.Record, error) {
-	return sst.checkFilter(key, dirPath)
+func (sst *SSTable) checkMultipleComp(key string, dirPath string) (*record.Record, error) {
+	return sst.checkFilterComp(key, dirPath)
 }
 
-func (sst *SSTable) checkFilter(key string, subdirPath string) (*record.Record, error) {
+func (sst *SSTable) checkFilterComp(key string, subdirPath string) (*record.Record, error) {
 	path := subdirPath + BLOOMNAME
 
 	bloomBytes, err := os.ReadFile(path)
@@ -160,11 +167,11 @@ func (sst *SSTable) checkFilter(key string, subdirPath string) (*record.Record, 
 		return nil, nil
 	} else {
 		// continue search in Summary
-		return sst.checkSummary(key, subdirPath)
+		return sst.checkSummaryComp(key, subdirPath)
 	}
 }
 
-func (sst *SSTable) checkSummary(key string, subdirPath string) (*record.Record, error) {
+func (sst *SSTable) checkSummaryComp(key string, subdirPath string) (*record.Record, error) {
 	path := subdirPath + SUMMARYNAME
 	file, err := os.Open(path)
 	if err != nil {
@@ -213,7 +220,7 @@ func (sst *SSTable) checkSummary(key string, subdirPath string) (*record.Record,
 		// reading key size
 		_, err := file.Read(keySizeBytes)
 		if err == io.EOF {
-			return sst.checkIndex(key, lastOffset, subdirPath)
+			return sst.checkIndexComp(key, lastOffset, subdirPath)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("error reading key size: %s\n", err)
@@ -238,7 +245,7 @@ func (sst *SSTable) checkSummary(key string, subdirPath string) (*record.Record,
 
 		// checking range
 		if string(readKey) > key {
-			return sst.checkIndex(key, lastOffset, subdirPath)
+			return sst.checkIndexComp(key, lastOffset, subdirPath)
 		} else {
 			// updating lastOffset
 			lastOffset = offset
@@ -248,7 +255,7 @@ func (sst *SSTable) checkSummary(key string, subdirPath string) (*record.Record,
 
 }
 
-func (sst *SSTable) checkIndex(key string, offset uint64, subdirPath string) (*record.Record, error) {
+func (sst *SSTable) checkIndexComp(key string, offset uint64, subdirPath string) (*record.Record, error) {
 	path := subdirPath + INDEXNAME
 	file, err := os.Open(path)
 	if err != nil {
@@ -295,7 +302,7 @@ func (sst *SSTable) checkIndex(key string, offset uint64, subdirPath string) (*r
 			return nil, nil
 		} else if string(readKey) == key {
 			// continue search in Data
-			return sst.checkData(offset, subdirPath)
+			return sst.checkDataComp(offset, subdirPath)
 		}
 
 	}
@@ -303,7 +310,7 @@ func (sst *SSTable) checkIndex(key string, offset uint64, subdirPath string) (*r
 	return nil, nil
 }
 
-func (sst *SSTable) checkData(offset uint64, subdirPath string) (*record.Record, error) {
+func (sst *SSTable) checkDataComp(offset uint64, subdirPath string) (*record.Record, error) {
 	path := subdirPath + DATANAME
 	file, err := os.Open(path)
 	if err != nil {
@@ -317,31 +324,33 @@ func (sst *SSTable) checkData(offset uint64, subdirPath string) (*record.Record,
 		return nil, fmt.Errorf("error seekign in Data: %s\n", err)
 	}
 
-	// reading header without value-size
-	headerBytes := make([]byte, record.RECORD_HEADER_SIZE)
-	_, err = file.Read(headerBytes)
+	var bufSize [binary.MaxVarintLen64]byte
+
+	// Read the SSTEntry size from the file into the buffer
+	_, err = file.Read(bufSize[:])
 	if err != nil {
-		return nil, fmt.Errorf("error reading header: %s\n", err)
+		return nil, err
 	}
 
-	// two cases if tombstone or not
-	var recBytes []byte
-
-	// getting key size
-	keySize := binary.LittleEndian.Uint64(headerBytes[record.KEY_SIZE_START:record.VALUE_SIZE_START])
-	// reading value size
-	valSize := binary.LittleEndian.Uint64(headerBytes[record.VALUE_SIZE_START:record.KEY_START])
-
-	// reading rest of the bytes
-	secondPartBytes := make([]byte, keySize+valSize)
-	_, err = file.Read(secondPartBytes)
-	if err != nil {
-		return nil, fmt.Errorf("error reading second part of record: %s\n", err)
+	// Decode the SSTEntry size from the buffer
+	entrySize, bytesRead := binary.Uvarint(bufSize[:])
+	if bytesRead <= 0 {
+		return nil, fmt.Errorf("failed to read varUint from file")
 	}
 
-	recBytes = append(headerBytes, secondPartBytes...)
+	_, err = file.Seek(-int64(binary.MaxVarintLen64-bytesRead), 1)
+	if err != nil {
+		return nil, err
+	}
 
-	valid, err := sst.checkMerkleMultiple(recBytes, subdirPath)
+	entryBytes := make([]byte, entrySize)
+
+	_, err = file.Read(entryBytes)
+	if err != nil {
+		return nil, fmt.Errorf("error reading filter: %s\n", err)
+	}
+
+	valid, err := sst.checkMerkleMultipleComp(entryBytes, subdirPath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading second part of record: %s\n", err)
 	}
@@ -350,11 +359,16 @@ func (sst *SSTable) checkData(offset uint64, subdirPath string) (*record.Record,
 		return nil, fmt.Errorf("Value not valid!\n")
 	}
 
-	return record.BytesToRecord(recBytes), nil
+	rec, err := record.SSTBytesToRecord(entryBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return rec, nil
 
 }
 
-func (sst *SSTable) checkMerkleMultiple(bytes []byte, subdirPath string) (bool, error) {
+func (sst *SSTable) checkMerkleMultipleComp(bytes []byte, subdirPath string) (bool, error) {
 	path := subdirPath + MERKLENAME
 
 	mtBytes, err := os.ReadFile(path)

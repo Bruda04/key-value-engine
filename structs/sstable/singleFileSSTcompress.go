@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-func (sst *SSTable) makeSingleFile(data []*record.Record, dirPath string) error {
+func (sst *SSTable) makeSingleFileComp(data []*record.Record, dirPath string) error {
 	file, err := os.Create(dirPath + string(os.PathSeparator) + SINGLEFILENAME)
 	if err != nil {
 		return err
@@ -22,62 +22,41 @@ func (sst *SSTable) makeSingleFile(data []*record.Record, dirPath string) error 
 	}
 
 	bf := bloomFilter.MakeBloomFilter(uint64(len(data)), sst.filterProbability)
-	dataSize := 0
-	indexSize := 0
-	summarySize := 2*record.KEY_SIZE_SIZE + data[0].GetKeySize() + data[len(data)-1].GetKeySize()
 	merkleData := make([][]byte, len(data))
-	for i, rec := range data {
-		sstEntry := rec.RecordToBytes()
-		dataSize += len(sstEntry)
 
-		indexSize += OFFSETSIZE + int(rec.GetKeySize()) + record.KEY_SIZE_SIZE
-
-		if i%sst.summaryFactor == 0 {
-			summarySize += OFFSETSIZE + rec.GetKeySize() + record.KEY_SIZE_SIZE
-		}
-
-		bf.Add([]byte(rec.GetKey()))
-
-		// filling merkleData
-		merkleData[i] = sstEntry
-	}
-
-	bfBytes := bf.BloomFilterToBytes()
-	filterSize := len(bfBytes)
-
-	dataOffset := make([]byte, OFFSETSIZE)
-	binary.LittleEndian.PutUint64(dataOffset, uint64(5*OFFSETSIZE))
-
-	indexOffset := make([]byte, OFFSETSIZE)
-	binary.LittleEndian.PutUint64(indexOffset, uint64(5*OFFSETSIZE+dataSize))
-	offsetHeader := append(dataOffset, indexOffset...)
-
-	summaryOffset := make([]byte, OFFSETSIZE)
-	binary.LittleEndian.PutUint64(summaryOffset, uint64(5*OFFSETSIZE+dataSize+indexSize))
-	offsetHeader = append(offsetHeader, summaryOffset...)
-
-	filterOffset := make([]byte, OFFSETSIZE)
-	binary.LittleEndian.PutUint64(filterOffset, uint64(5*OFFSETSIZE+dataSize+indexSize+int(summarySize)))
-	offsetHeader = append(offsetHeader, filterOffset...)
-
-	merkleOffset := make([]byte, OFFSETSIZE)
-	binary.LittleEndian.PutUint64(merkleOffset, uint64(5*OFFSETSIZE+dataSize+indexSize+int(summarySize)+filterSize))
-	offsetHeader = append(offsetHeader, merkleOffset...)
-
-	_, err = file.Write(offsetHeader)
+	dataPos, err := file.Seek(5*OFFSETSIZE, 0)
 	if err != nil {
-		return fmt.Errorf("error writing file header: %s\n", err)
+		return err
 	}
 
 	// Writting data
-	for _, rec := range data {
-		_, err := file.Write(rec.RecordToBytes())
+	for i, rec := range data {
+		recSer := rec.SSTRecordToBytes()
+		recSerSizeBytes := make([]byte, binary.MaxVarintLen64)
+		recSizeLen := binary.PutUvarint(recSerSizeBytes, uint64(len(recSer)))
+
+		_, err := file.Write(recSerSizeBytes[:recSizeLen])
 		if err != nil {
 			return fmt.Errorf("error writing record: %s\n", err)
 		}
+		_, err = file.Write(recSer)
+		if err != nil {
+			return fmt.Errorf("error writing record: %s\n", err)
+		}
+
+		// populating Filter
+		bf.Add([]byte(rec.GetKey()))
+
+		// filling merkleData
+		merkleData[i] = recSer
 	}
 
-	// Writting Index
+	// Write Index
+	indexPos, err := file.Seek(0, 1)
+	if err != nil {
+		return err
+	}
+
 	offsetIndex := 0
 	for _, rec := range data {
 		result := sst.indexFormatToBytes(rec, offsetIndex)
@@ -88,10 +67,17 @@ func (sst *SSTable) makeSingleFile(data []*record.Record, dirPath string) error 
 		}
 
 		// updating offset
-		offsetIndex += len(rec.RecordToBytes())
+		recSer := rec.SSTRecordToBytes()
+		recSerSizeBytes := make([]byte, binary.MaxVarintLen64)
+		recSizeLen := binary.PutUvarint(recSerSizeBytes, uint64(len(recSer)))
+		offsetIndex += len(recSer) + recSizeLen
 	}
 
-	// Writting Sumarry
+	// Write Summary
+	summaryPos, err := file.Seek(0, 1)
+	if err != nil {
+		return err
+	}
 
 	// getting low and high key range
 	low := data[0]
@@ -103,20 +89,20 @@ func (sst *SSTable) makeSingleFile(data []*record.Record, dirPath string) error 
 
 	lowKeyBytes := []byte(low.GetKey())
 
-	header := append(lowKeySizeBytes, lowKeyBytes...)
+	summaryHeader := append(lowKeySizeBytes, lowKeyBytes...)
 
 	// serializing high-key
 	highKeySizeBytes := make([]byte, record.KEY_SIZE_SIZE)
 	binary.LittleEndian.PutUint64(highKeySizeBytes, high.GetKeySize())
 
-	header = append(header, highKeySizeBytes...)
+	summaryHeader = append(summaryHeader, highKeySizeBytes...)
 
 	highKeyBytes := []byte(high.GetKey())
 
-	header = append(header, highKeyBytes...)
+	summaryHeader = append(summaryHeader, highKeyBytes...)
 
 	// writting header
-	_, err = file.Write(header)
+	_, err = file.Write(summaryHeader)
 	if err != nil {
 		return fmt.Errorf("error writing header: %s\n", err)
 	}
@@ -136,29 +122,56 @@ func (sst *SSTable) makeSingleFile(data []*record.Record, dirPath string) error 
 		offsetSummary += OFFSETSIZE + record.KEY_SIZE_SIZE + int(rec.GetKeySize())
 	}
 
-	// writting bloom filter
-	_, err = file.Write(bfBytes)
+	filterPos, err := file.Seek(0, 1)
 	if err != nil {
-		return fmt.Errorf("error writing bloom filter to Filter: %s\n", err)
+		return err
 	}
 
-	// making merkle
-	mt := merkleTree.MakeMerkleTree(merkleData)
-	mtBytes, _ := merkleTree.SerializeMerkleTree(mt)
+	bfBytes := bf.BloomFilterToBytes()
+
+	_, err = file.Write(bfBytes)
 	if err != nil {
-		return fmt.Errorf("error serializing Merkle: %s\n", err)
+		return fmt.Errorf("error writing Index entry: %s\n", err)
 	}
-	// writting merkle
+
+	merklePos, err := file.Seek(0, 1)
+	if err != nil {
+		return err
+	}
+
+	mt := merkleTree.MakeMerkleTree(merkleData)
+
+	mtBytes, err := merkleTree.SerializeMerkleTree(mt)
+	if err != nil {
+		return err
+	}
+
 	_, err = file.Write(mtBytes)
 	if err != nil {
-		return fmt.Errorf("error writing Merkle: %s\n", err)
+		return fmt.Errorf("error writing Index entry: %s\n", err)
+	}
+
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+
+	header := []uint64{uint64(dataPos), uint64(indexPos), uint64(summaryPos), uint64(filterPos), uint64(merklePos)}
+
+	for _, pos := range header {
+		offsetBytes := make([]byte, OFFSETSIZE)
+		binary.LittleEndian.PutUint64(offsetBytes, pos)
+
+		_, err = file.Write(offsetBytes)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
-
 }
 
-func (sst *SSTable) checkSingle(key string, dirPath string) (*record.Record, error) {
+func (sst *SSTable) checkSingleComp(key string, dirPath string) (*record.Record, error) {
 	path := dirPath + SINGLEFILENAME
 	file, err := os.Open(path)
 	if err != nil {
@@ -180,10 +193,10 @@ func (sst *SSTable) checkSingle(key string, dirPath string) (*record.Record, err
 		binary.LittleEndian.Uint64(headerBytes[4*OFFSETSIZE:]),
 	}
 
-	return sst.checkFilterSingle(key, file, header)
+	return sst.checkFilterSingleComp(key, file, header)
 }
 
-func (sst *SSTable) checkFilterSingle(key string, file *os.File, header []uint64) (*record.Record, error) {
+func (sst *SSTable) checkFilterSingleComp(key string, file *os.File, header []uint64) (*record.Record, error) {
 	_, err := file.Seek(int64(header[3]), 0)
 	if err != nil {
 		return nil, fmt.Errorf("error seeking: %s\n", err)
@@ -197,19 +210,19 @@ func (sst *SSTable) checkFilterSingle(key string, file *os.File, header []uint64
 
 	bf, err := bloomFilter.BytesToBloomFilter(filterBytes)
 	if err != nil {
-		return nil, fmt.Errorf("error reading filter: %s\n", err)
+		return nil, err
 	}
 
 	// not found
 	if !bf.IsPresent([]byte(key)) {
 		return nil, nil
 	} else {
-		return sst.checkSummarySingle(key, file, header)
+		return sst.checkSummarySingleComp(key, file, header)
 	}
 
 }
 
-func (sst *SSTable) checkSummarySingle(key string, file *os.File, header []uint64) (*record.Record, error) {
+func (sst *SSTable) checkSummarySingleComp(key string, file *os.File, header []uint64) (*record.Record, error) {
 	_, err := file.Seek(int64(header[2]), 0)
 	if err != nil {
 		return nil, fmt.Errorf("error seeking: %s\n", err)
@@ -258,7 +271,7 @@ func (sst *SSTable) checkSummarySingle(key string, file *os.File, header []uint6
 			return nil, fmt.Errorf("error reading key size: %s\n", err)
 		}
 		if position == int64(header[3]) {
-			return sst.checkIndexSingle(key, lastOffset, file, header)
+			return sst.checkIndexSingleComp(key, lastOffset, file, header)
 		}
 
 		_, err = file.Read(keySizeBytes)
@@ -285,7 +298,7 @@ func (sst *SSTable) checkSummarySingle(key string, file *os.File, header []uint6
 
 		// checking range
 		if string(readKey) > key {
-			return sst.checkIndexSingle(key, lastOffset, file, header)
+			return sst.checkIndexSingleComp(key, lastOffset, file, header)
 		} else {
 			// updating lastOffset
 			lastOffset = offset
@@ -294,7 +307,7 @@ func (sst *SSTable) checkSummarySingle(key string, file *os.File, header []uint6
 	}
 }
 
-func (sst *SSTable) checkIndexSingle(key string, offset uint64, file *os.File, header []uint64) (*record.Record, error) {
+func (sst *SSTable) checkIndexSingleComp(key string, offset uint64, file *os.File, header []uint64) (*record.Record, error) {
 	_, err := file.Seek(int64(header[1])+int64(offset), 0)
 	if err != nil {
 		return nil, fmt.Errorf("error seeking: %s\n", err)
@@ -338,44 +351,47 @@ func (sst *SSTable) checkIndexSingle(key string, offset uint64, file *os.File, h
 			return nil, nil
 		} else if string(readKey) == key {
 			// continue search in Data
-			return sst.checkDataSingle(offset, file, header)
+			return sst.checkDataSingleComp(offset, file, header)
 		}
 
 	}
 	return nil, nil
 }
 
-func (sst *SSTable) checkDataSingle(offset uint64, file *os.File, header []uint64) (*record.Record, error) {
+func (sst *SSTable) checkDataSingleComp(offset uint64, file *os.File, header []uint64) (*record.Record, error) {
 	// seeking to position
 	_, err := file.Seek(int64(header[0])+int64(offset), 0)
 	if err != nil {
 		return nil, fmt.Errorf("error seekign in Data: %s\n", err)
 	}
 
-	// reading header without value-size
-	headerBytes := make([]byte, record.RECORD_HEADER_SIZE)
-	_, err = file.Read(headerBytes)
+	var bufSize [binary.MaxVarintLen64]byte
+
+	// Read the SSTEntry size from the file into the buffer
+	_, err = file.Read(bufSize[:])
 	if err != nil {
-		return nil, fmt.Errorf("error reading header: %s\n", err)
+		return nil, err
 	}
 
-	// two cases if tombstone or not
-	var recBytes []byte
-
-	// getting key size
-	keySize := binary.LittleEndian.Uint64(headerBytes[record.KEY_SIZE_START:record.VALUE_SIZE_START])
-	valSize := binary.LittleEndian.Uint64(headerBytes[record.VALUE_SIZE_START:record.KEY_START])
-
-	// reading rest of the bytes
-	secondPartBytes := make([]byte, keySize+valSize)
-	_, err = file.Read(secondPartBytes)
-	if err != nil {
-		return nil, fmt.Errorf("error reading second part of record: %s\n", err)
+	// Decode the SSTEntry size from the buffer
+	entrySize, bytesRead := binary.Uvarint(bufSize[:])
+	if bytesRead <= 0 {
+		return nil, fmt.Errorf("failed to read varUint from file")
 	}
 
-	recBytes = append(headerBytes, secondPartBytes...)
+	_, err = file.Seek(-int64(binary.MaxVarintLen64-bytesRead), 1)
+	if err != nil {
+		return nil, err
+	}
 
-	valid, err := sst.checkMerkleSingle(recBytes, file, header)
+	entryBytes := make([]byte, entrySize)
+
+	_, err = file.Read(entryBytes)
+	if err != nil {
+		return nil, fmt.Errorf("error reading filter: %s\n", err)
+	}
+
+	valid, err := sst.checkMerkleSingleComp(entryBytes, file, header)
 	if err != nil {
 		return nil, fmt.Errorf("error checking merkle: %s\n", err)
 	}
@@ -384,10 +400,15 @@ func (sst *SSTable) checkDataSingle(offset uint64, file *os.File, header []uint6
 		return nil, fmt.Errorf("Value not valid!\n")
 	}
 
-	return record.BytesToRecord(recBytes), nil
+	rec, err := record.SSTBytesToRecord(entryBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return rec, nil
 }
 
-func (sst *SSTable) checkMerkleSingle(bytes []byte, file *os.File, header []uint64) (bool, error) {
+func (sst *SSTable) checkMerkleSingleComp(bytes []byte, file *os.File, header []uint64) (bool, error) {
 	_, err := file.Seek(int64(header[4]), 0)
 	if err != nil {
 		return false, fmt.Errorf("error seekign in Merkle: %s\n", err)

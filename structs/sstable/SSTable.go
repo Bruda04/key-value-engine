@@ -24,9 +24,10 @@ type SSTable struct {
 	summaryFactor     int
 	multipleFiles     bool
 	filterProbability float64
+	compression       bool
 }
 
-func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float64) (*SSTable, error) {
+func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float64, compress bool) (*SSTable, error) {
 	if _, err := os.Stat(DIRECTORY); os.IsNotExist(err) {
 		if err := os.MkdirAll(DIRECTORY, 0755); err != nil {
 			return nil, fmt.Errorf("error creating sstable directory: %s", err)
@@ -45,6 +46,7 @@ func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float6
 		summaryFactor:     summaryFactor,
 		multipleFiles:     multipleFiles,
 		filterProbability: filterProbability,
+		compression:       compress,
 	}, nil
 }
 
@@ -62,27 +64,48 @@ func (sst *SSTable) Get(key string) (*record.Record, error) {
 		files, _ := readTOC(DIRECTORY + string(os.PathSeparator) + subdir)
 
 		if len(files) > 1 {
-			// checking bloom filter
-			found, err := sst.checkMultiple(key, subdirPath)
-			if err != nil {
-				return nil, fmt.Errorf("error finding key: %s\n", err)
-			}
+			if sst.compression {
+				found, err := sst.checkMultipleComp(key, subdirPath)
+				if err != nil {
+					return nil, fmt.Errorf("error finding key: %s\n", err)
+				}
+				// if found return, otherwise continue search in next SST
+				if found != nil {
+					return found, nil
+				}
 
-			// if found return, otherwise continue search in next SST
-			if found != nil {
-				return found, nil
+			} else {
+				found, err := sst.checkMultiple(key, subdirPath)
+				if err != nil {
+					return nil, fmt.Errorf("error finding key: %s\n", err)
+				}
+				// if found return, otherwise continue search in next SST
+				if found != nil {
+					return found, nil
+				}
 			}
 
 		} else {
-			// checking bloom filter
-			found, err := sst.checkSingle(key, subdirPath)
-			if err != nil {
-				return nil, fmt.Errorf("error finding key: %s\n", err)
-			}
+			if sst.compression {
+				found, err := sst.checkSingleComp(key, subdirPath)
+				if err != nil {
+					return nil, fmt.Errorf("error finding key: %s\n", err)
+				}
 
-			// if found return, otherwise continue search in next SST
-			if found != nil {
-				return found, nil
+				// if found return, otherwise continue search in next SST
+				if found != nil {
+					return found, nil
+				}
+			} else {
+				found, err := sst.checkSingle(key, subdirPath)
+				if err != nil {
+					return nil, fmt.Errorf("error finding key: %s\n", err)
+				}
+
+				// if found return, otherwise continue search in next SST
+				if found != nil {
+					return found, nil
+				}
 			}
 		}
 
@@ -103,10 +126,18 @@ func (sst *SSTable) Flush(data []*record.Record) error {
 
 	if sst.multipleFiles {
 		// make Multiple files
-		err = sst.makeMultipleFiles(data, dirPath)
+		if sst.compression {
+			err = sst.makeMultipleFilesComp(data, dirPath)
+		} else {
+			err = sst.makeMultipleFiles(data, dirPath)
+		}
 	} else {
 		// make Single file
-		err = sst.makeSingleFile(data, dirPath)
+		if sst.compression {
+			err = sst.makeSingleFileComp(data, dirPath)
+		} else {
+			err = sst.makeSingleFile(data, dirPath)
+		}
 	}
 
 	return nil
