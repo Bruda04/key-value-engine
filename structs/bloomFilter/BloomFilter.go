@@ -1,6 +1,8 @@
 package bloomFilter
 
 import (
+	"encoding/binary"
+	"errors"
 	"math"
 )
 
@@ -75,101 +77,62 @@ func (b *BloomFilter) IsPresent(element []byte) bool {
 }
 
 func (bf *BloomFilter) BloomFilterToBytes() []byte {
-	var result []byte
+	elNumBytes := make([]byte, EL_NUM_SIZE)
+	binary.LittleEndian.PutUint64(elNumBytes, bf.elNum)
 
-	// Encode element number using variable-length encoding
-	elNumBytes := encodeVarUint64(bf.elNum)
-	result = append(result, elNumBytes...)
+	hashNumBytes := make([]byte, HASH_NUM_SIZE)
+	binary.LittleEndian.PutUint64(hashNumBytes, bf.hashNum)
 
-	// Encode hash number using variable-length encoding
-	hashNumBytes := encodeVarUint64(bf.hashNum)
-	result = append(result, hashNumBytes...)
+	sizeBytes := make([]byte, SIZE_SIZE)
+	binary.LittleEndian.PutUint64(sizeBytes, bf.size)
 
-	// Encode size using variable-length encoding
-	sizeBytes := encodeVarUint64(bf.size)
-	result = append(result, sizeBytes...)
-
-	// Encode hash functions
+	var hashFuncBytes []byte
 	for _, hf := range bf.hashFunctions {
-		// Encode seed size using variable-length encoding
-		seedSizeBytes := encodeVarUint64(uint64(len(hf.Seed)))
-		result = append(result, seedSizeBytes...)
-
-		// Append seed
-		result = append(result, hf.Seed...)
+		seedSizeBytes := make([]byte, SEED_SIZE_SIZE)
+		binary.LittleEndian.PutUint64(seedSizeBytes, uint64(len(hf.Seed)))
+		hashFuncBytes = append(hashFuncBytes, seedSizeBytes...)
+		hashFuncBytes = append(hashFuncBytes, hf.Seed...)
 	}
 
-	// Append data
+	result := append(elNumBytes, hashNumBytes...)
+	result = append(result, sizeBytes...)
+	result = append(result, hashFuncBytes...)
 	result = append(result, bf.data...)
 
 	return result
 }
 
-// Helper function to encode uint64 as variable-length bytes
-func encodeVarUint64(value uint64) []byte {
-	var encoded []byte
-	for value >= 0x80 {
-		encoded = append(encoded, byte(value)|0x80)
-		value >>= 7
-	}
-	encoded = append(encoded, byte(value))
-	return encoded
-}
-
 func BytesToBloomFilter(data []byte) (*BloomFilter, error) {
-	bf := &BloomFilter{}
+	if len(data) < BLOOM_FILTER_HEADER_SIZE {
+		return nil, errors.New("insufficient data for BloomFilter header")
+	}
 
-	// Decode element number
-	elNum, bytesRead := decodeVarUint64(data)
-	bf.elNum = elNum
-	data = data[bytesRead:]
+	elNum := binary.LittleEndian.Uint64(data[EL_NUM_START:HASH_NUM_START])
+	hashNum := binary.LittleEndian.Uint64(data[HASH_NUM_START:SIZE_START])
+	size := binary.LittleEndian.Uint64(data[SIZE_START:HASH_FUNC_START])
 
-	// Decode hash number
-	hashNum, bytesRead := decodeVarUint64(data)
-	bf.hashNum = hashNum
-	data = data[bytesRead:]
+	if len(data) < int(BLOOM_FILTER_HEADER_SIZE+size) {
+		return nil, errors.New("insufficient data for BloomFilter payload")
+	}
 
-	// Decode size
-	size, bytesRead := decodeVarUint64(data)
-	bf.size = size
-	data = data[bytesRead:]
-
-	// Decode hash functions
 	var hashFunctions []HashWithSeed
+	index := HASH_FUNC_START
 	for i := 0; i < int(hashNum); i++ {
-		// Decode seed size
-		seedSize, bytesRead := decodeVarUint64(data)
-		data = data[bytesRead:]
-
-		// Extract seed
-		seed := data[:seedSize]
-		data = data[seedSize:]
+		seedSize := binary.LittleEndian.Uint64(data[index : index+SEED_SIZE_SIZE])
+		index += SEED_SIZE_SIZE
+		seed := data[index : index+int(seedSize)]
+		index += int(seedSize)
 
 		hashFunctions = append(hashFunctions, HashWithSeed{Seed: seed})
 	}
-	bf.hashFunctions = hashFunctions
 
-	// The remaining data is the Bloom filter data
-	bf.data = data
+	bf := &BloomFilter{
+		elNum:         elNum,
+		hashNum:       hashNum,
+		size:          size,
+		hashFunctions: hashFunctions,
+		data:          data[index:],
+	}
 
 	return bf, nil
-}
-
-// Helper function to decode variable-length uint64 from byte slice
-func decodeVarUint64(data []byte) (uint64, int) {
-	var result uint64
-	var bytesRead int
-	for shift := 0; shift < 64; shift += 7 {
-		if len(data) == 0 {
-			break
-		}
-		b := data[0]
-		data = data[1:]
-		result |= (uint64(b) & 0x7F) << shift
-		bytesRead++
-		if b&0x80 == 0 {
-			break
-		}
-	}
-	return result, bytesRead
 }
