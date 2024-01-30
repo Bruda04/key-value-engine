@@ -23,8 +23,30 @@ Initialize Memtable Manager
 		-skiplist
 		-hashmap
 */
+
+func NewDefaultMemTableManager() *MemManager {
+	DEAFULTMEMTABLES := 5
+
+	tables := make([]*MemTable, DEAFULTMEMTABLES)
+	for i := 0; i < 5; i++ {
+		tables[i] = MakeDefaultMemtable()
+	}
+
+	return &MemManager{
+		currentTable: tables[0],
+		tables:       tables,
+		currentIndex: 0,
+		maxTables:    DEAFULTMEMTABLES,
+		initialFill:  false, //initial round of tables hasn't been filled
+	}
+}
+
 func NewMemTableManager(maxTables int, maxCapacity int, structType string) *MemManager {
 	// Create initial MemTables
+	if maxTables <= 0 || maxCapacity <= 0 {
+		return NewDefaultMemTableManager()
+	}
+
 	tables := make([]*MemTable, maxTables)
 	for i := 0; i < maxTables; i++ {
 		tables[i] = MakeMemTable(maxCapacity, structType)
