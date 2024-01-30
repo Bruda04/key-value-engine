@@ -9,5 +9,7 @@
   "do_compression": false,
   "compression_tyoe": "size-tiered",
   "max_lsm_levels": 10,
-  "tables_to_compress": 5
+  "tables_to_compress": 5,
+  "token-capacity": 10,
+  "refill-cooldown": 60
 }

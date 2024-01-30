@@ -21,6 +21,8 @@ const (
 	DEFAULT_MAXLSMLEVELS        = 10
 	DEFAULT_TABLESTOCOMPRESS    = 5
 	DEFAULT_COMPRESSIONTYPE     = "size-tiered"
+	DEFAULT_TOKENCAPACITY       = 10
+	DEFAULT_REFILLCOOLDOWN      = 60
 )
 
 type Config struct {
@@ -35,6 +37,8 @@ type Config struct {
 	CompressionType     string `json:"compression_tyoe"`
 	MaxLsmLevels        uint64 `json:"max_lsm_levels"`
 	TablesToCompress    uint64 `json:"tables_to_compress"`
+	TokenCapacity       uint64 `json:"token-capacity"`
+	RefillCooldown      uint64 `json:"refill-cooldown"`
 }
 
 func MakeConfig() (*Config, error) {
@@ -52,6 +56,8 @@ func MakeConfig() (*Config, error) {
 		CompressionType:     DEFAULT_COMPRESSIONTYPE,
 		MaxLsmLevels:        DEFAULT_MAXLSMLEVELS,
 		TablesToCompress:    DEFAULT_TABLESTOCOMPRESS,
+		TokenCapacity:       DEFAULT_TOKENCAPACITY,
+		RefillCooldown:      DEFAULT_REFILLCOOLDOWN,
 	}
 
 	if _, err := os.Stat(CONFIG_DIR); os.IsNotExist(err) {
@@ -127,6 +133,14 @@ func (cfg *Config) validate() {
 
 	if cfg.TablesToCompress < 2 || cfg.TablesToCompress > 8 {
 		cfg.TablesToCompress = DEFAULT_TABLESTOCOMPRESS
+	}
+
+	if cfg.TokenCapacity < 2 || cfg.TokenCapacity > 100 {
+		cfg.TokenCapacity = DEFAULT_TOKENCAPACITY
+	}
+
+	if cfg.RefillCooldown < 1 || cfg.RefillCooldown > 600 {
+		cfg.RefillCooldown = DEFAULT_REFILLCOOLDOWN
 	}
 }
 
