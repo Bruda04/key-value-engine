@@ -12,6 +12,7 @@ const (
 
 	DEFAULT_WALSIZE             = 20
 	DEFAULT_MEMTABLESIZE        = 20
+	DEFAULT_MEMTABLECOUNT       = 5
 	DEFAULT_MEMTABLESTRUCT      = "btree"
 	DEFAULT_SKIPLISTMAXHEIGHT   = 20
 	DEFAULT_BTREEDEGREE         = 4
@@ -28,6 +29,7 @@ const (
 type Config struct {
 	WalSize             uint64 `json:"wal_size"`
 	MemtableSize        uint64 `json:"memtable_size"`
+	MemtableCount       uint64 `json:"memtable_count"`
 	MemtableStructure   string `json:"memtable_structure"`
 	BTreeDegree         uint64 `json:"btree_degree"`
 	SkipListMaxHeight   uint64 `json:"skip_list_max_height"`
@@ -47,6 +49,7 @@ func MakeConfig() (*Config, error) {
 	cfg = Config{
 		WalSize:             DEFAULT_WALSIZE,
 		MemtableSize:        DEFAULT_MEMTABLESIZE,
+		MemtableCount:       DEFAULT_MEMTABLECOUNT,
 		MemtableStructure:   DEFAULT_MEMTABLESTRUCT,
 		BTreeDegree:         DEFAULT_BTREEDEGREE,
 		SkipListMaxHeight:   DEFAULT_SKIPLISTMAXHEIGHT,
@@ -101,6 +104,10 @@ func (cfg *Config) validate() {
 
 	if cfg.MemtableSize < 0 {
 		cfg.MemtableSize = DEFAULT_MEMTABLESIZE
+	}
+
+	if cfg.MemtableCount < 2 || cfg.MemtableCount > 10 {
+		cfg.MemtableCount = DEFAULT_MEMTABLECOUNT
 	}
 
 	if cfg.MemtableStructure != "btree" && cfg.MemtableStructure != "skiplist" && cfg.MemtableStructure != "hashmap" {
