@@ -1,6 +1,7 @@
 package memtable
 
 import (
+	"fmt"
 	"key-value-engine/structs/record"
 )
 
@@ -64,6 +65,7 @@ func (mm *MemManager) FindInMem(key string) bool {
 func (mm *MemManager) FlushMem() {
 	//create sst
 	mm.currentTable.Clear()
+	fmt.Print("Flush this shit")
 	//flush acompanying wal
 }
 

@@ -67,7 +67,7 @@ func MakeMemTable(maxCapacity int, structType string) *MemTable {
 			structType:  structType,
 			bTree:       nil,
 			skipList:    nil,
-			hashMap:     nil,
+			hashMap:     make(map[string]*record.Record),
 		}
 	} else {
 		return MakeDefaultMemtable()
@@ -76,11 +76,12 @@ func MakeMemTable(maxCapacity int, structType string) *MemTable {
 
 func (mem *MemTable) Clear() {
 	if mem.structType == "btree" {
-		mem.bTree = nil
+		bt, _ := btree.MakeBTree(mem.maxCapacity)
+		mem.bTree = bt
 	} else if mem.structType == "skiplist" {
-		mem.skipList = nil
+		mem.skipList = skipList.MakeSkipList(mem.maxCapacity)
 	} else if mem.structType == "hashmap" {
-		mem.hashMap = nil
+		mem.hashMap = make(map[string]*record.Record)
 	}
 
 	mem.capacity = 0
