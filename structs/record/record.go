@@ -211,7 +211,7 @@ Returns:
 
 The function distinguishes between regular records and tombstone records.
 */
-func (r *Record) SSTRecordToBytes() []byte {
+func (r *Record) SSTRecordToBytes(dictIndex int) []byte {
 	if !r.tombstone {
 		crcBytes := make([]byte, binary.MaxVarintLen64)
 		binary.PutUvarint(crcBytes, uint64(r.crc))
@@ -227,22 +227,20 @@ func (r *Record) SSTRecordToBytes() []byte {
 			tombstoneBytes[0] = 1
 		}
 
-		keySizeBytes := make([]byte, binary.MaxVarintLen64)
-		encodedSize = binary.PutUvarint(keySizeBytes, r.keySize)
-		keySizeBytes = keySizeBytes[:encodedSize]
+		keyIndexBytes := make([]byte, binary.MaxVarintLen64)
+		encodedSize = binary.PutUvarint(keyIndexBytes, uint64(dictIndex))
+		keyIndexBytes = keyIndexBytes[:encodedSize]
 
 		valueSizeBytes := make([]byte, binary.MaxVarintLen64)
 		encodedSize = binary.PutUvarint(valueSizeBytes, r.valueSize)
 		valueSizeBytes = valueSizeBytes[:encodedSize]
 
-		keyBytes := []byte(r.key)
 		valueBytes := r.value
 
 		result := append(crcBytes, timestampBytes...)
 		result = append(result, tombstoneBytes...)
-		result = append(result, keySizeBytes...)
+		result = append(result, keyIndexBytes...)
 		result = append(result, valueSizeBytes...)
-		result = append(result, keyBytes...)
 		result = append(result, valueBytes...)
 
 		return result
@@ -260,16 +258,13 @@ func (r *Record) SSTRecordToBytes() []byte {
 			tombstoneBytes[0] = 1
 		}
 
-		keySizeBytes := make([]byte, binary.MaxVarintLen64)
-		encodedSize = binary.PutUvarint(keySizeBytes, r.keySize)
-		keySizeBytes = keySizeBytes[:encodedSize]
-
-		keyBytes := []byte(r.key)
+		keyIndexBytes := make([]byte, binary.MaxVarintLen64)
+		encodedSize = binary.PutUvarint(keyIndexBytes, uint64(dictIndex))
+		keyIndexBytes = keyIndexBytes[:encodedSize]
 
 		result := append(crcBytes, timestampBytes...)
 		result = append(result, tombstoneBytes...)
-		result = append(result, keySizeBytes...)
-		result = append(result, keyBytes...)
+		result = append(result, keyIndexBytes...)
 
 		return result
 	}
@@ -287,7 +282,7 @@ Returns:
 The function distinguishes between regular records and tombstone records by checking
 the value at the TOMBSTONE_START position in the byte slice.
 */
-func SSTBytesToRecord(data []byte) (*Record, error) {
+func SSTBytesToRecord(data []byte, globalDict *map[string]int) (*Record, error) {
 	// Read and decode the CRC
 	crc, n := binary.Uvarint(data)
 	if n <= 0 {
@@ -307,23 +302,26 @@ func SSTBytesToRecord(data []byte) (*Record, error) {
 	data = data[1:]
 
 	// Read and decode the key size
-	keySize, n := binary.Uvarint(data)
+	keyIndex, n := binary.Uvarint(data)
 	if n <= 0 {
 		return nil, errors.New("failed to decode")
 	}
 	data = data[n:]
 
 	key := ""
-	if tombstone {
-		// Read the key bytes
-		keyBytes := data[:keySize]
-		key = string(keyBytes)
+	for k, v := range *globalDict {
+		if v == int(keyIndex) {
+			key = k
+			break
+		}
+	}
 
+	if tombstone {
 		return &Record{
 			crc:       uint32(crc),
 			timestamp: timestamp,
 			tombstone: tombstone,
-			keySize:   keySize,
+			keySize:   uint64(len(key)),
 			key:       key,
 		}, nil
 	}
@@ -335,11 +333,6 @@ func SSTBytesToRecord(data []byte) (*Record, error) {
 	}
 	data = data[n:]
 
-	// Read the key bytes
-	keyBytes := data[:keySize]
-	key = string(keyBytes)
-	data = data[keySize:]
-
 	// Read the value bytes
 	value := data[:valueSize]
 
@@ -347,7 +340,7 @@ func SSTBytesToRecord(data []byte) (*Record, error) {
 		crc:       uint32(crc),
 		timestamp: timestamp,
 		tombstone: tombstone,
-		keySize:   keySize,
+		keySize:   uint64(len(key)),
 		valueSize: valueSize,
 		key:       key,
 		value:     value,
