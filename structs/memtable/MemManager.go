@@ -61,6 +61,23 @@ func NewMemTableManager(maxTables int, maxCapacity int, structType string) *MemM
 	}
 }
 
+// flush oldest memtable/create sstable/flush wal
+func (mm *MemManager) FlushMem() {
+	//create sst
+	mm.currentTable.Clear()
+	fmt.Print("Flush this shit")
+	//flush acompanying wal
+}
+
+func (mm *MemManager) SwitchTable() {
+	// Switch to the next table
+	if mm.currentIndex == mm.maxTables-1 {
+		mm.initialFill = true
+	}
+	mm.currentIndex = (mm.currentIndex + 1) % mm.maxTables
+	mm.currentTable = mm.tables[mm.currentIndex]
+}
+
 // add new element to the current memtable
 func (mm *MemManager) PutMem(rec *record.Record) {
 	mm.currentTable.Put(rec)
@@ -73,6 +90,10 @@ func (mm *MemManager) PutMem(rec *record.Record) {
 	}
 }
 
+func (mm *MemManager) GetCurrentTable() *MemTable {
+	return mm.currentTable
+}
+
 // find if element exists in any of the memtables
 func (mm *MemManager) FindInMem(key string) bool {
 	for i := 0; i < mm.maxTables; i++ {
@@ -83,23 +104,10 @@ func (mm *MemManager) FindInMem(key string) bool {
 	return false
 }
 
-// flush oldest memtable/create sstable/flush wal
-func (mm *MemManager) FlushMem() {
-	//create sst
-	mm.currentTable.Clear()
-	fmt.Print("Flush this shit")
-	//flush acompanying wal
-}
-
-func (mm *MemManager) GetCurrentTable() *MemTable {
-	return mm.currentTable
-}
-
-func (mm *MemManager) SwitchTable() {
-	// Switch to the next table
-	if mm.currentIndex == mm.maxTables-1 {
-		mm.initialFill = true
+func (mm *MemManager) RangeScanMem(min_range string, max_range string) []*record.Record {
+	var ret []*record.Record
+	for i := 0; i < mm.maxTables; i++ {
+		ret = append(ret, mm.tables[i].getSortedRange(min_range, max_range)...)
 	}
-	mm.currentIndex = (mm.currentIndex + 1) % mm.maxTables
-	mm.currentTable = mm.tables[mm.currentIndex]
+	return ret
 }

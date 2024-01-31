@@ -4,8 +4,10 @@ import (
 	"key-value-engine/structs/btree"
 	"key-value-engine/structs/record"
 	"key-value-engine/structs/skipList"
+	"sort"
 )
 
+// keys exists to be able to sort hashmap
 type MemTable struct {
 	maxCapacity int
 	capacity    int
@@ -13,6 +15,7 @@ type MemTable struct {
 	skipList    *skipList.SkipList
 	bTree       *btree.BTree
 	hashMap     map[string]*record.Record
+	keys        []string
 }
 
 // In case of incorrectly passed values creates default memtable/*
@@ -24,6 +27,7 @@ func MakeDefaultMemtable() (mem *MemTable) {
 		bTree:       nil,
 		skipList:    skipList.MakeSkipList(100),
 		hashMap:     nil,
+		keys:        nil,
 	}
 }
 
@@ -50,6 +54,7 @@ func MakeMemTable(maxCapacity int, structType string) *MemTable {
 			bTree:       bTree,
 			skipList:    nil,
 			hashMap:     nil,
+			keys:        nil,
 		}
 	} else if structType == "skiplist" {
 		return &MemTable{
@@ -59,6 +64,7 @@ func MakeMemTable(maxCapacity int, structType string) *MemTable {
 			bTree:       nil,
 			skipList:    skipList.MakeSkipList(maxCapacity),
 			hashMap:     nil,
+			keys:        nil,
 		}
 	} else if structType == "hashmap" {
 		return &MemTable{
@@ -68,6 +74,7 @@ func MakeMemTable(maxCapacity int, structType string) *MemTable {
 			bTree:       nil,
 			skipList:    nil,
 			hashMap:     make(map[string]*record.Record),
+			keys:        []string{},
 		}
 	} else {
 		return MakeDefaultMemtable()
@@ -82,6 +89,7 @@ func (mem *MemTable) Clear() {
 		mem.skipList = skipList.MakeSkipList(mem.maxCapacity)
 	} else if mem.structType == "hashmap" {
 		mem.hashMap = make(map[string]*record.Record)
+		mem.keys = []string{}
 	}
 
 	mem.capacity = 0
@@ -106,6 +114,7 @@ func (mem *MemTable) Put(rec *record.Record) {
 		mem.skipList.Insert(rec)
 	} else {
 		mem.hashMap[rec.GetKey()] = rec
+		mem.keys = append(mem.keys, rec.GetKey())
 	}
 
 	mem.capacity += 1
@@ -116,4 +125,45 @@ func (mem *MemTable) isEmpty() bool {
 		return true
 	}
 	return false
+}
+
+func (mem *MemTable) GetSorted() []*record.Record {
+	if mem.structType == "btree" {
+		return mem.bTree.GetSorted()
+	} else if mem.structType == "skiplist" {
+		return mem.skipList.GetSortedList()
+	}
+	return mem.getSortedMap()
+}
+
+func (mem *MemTable) getSortedMap() []*record.Record {
+	sort.Strings(mem.keys)
+
+	var ret []*record.Record
+	for i := 0; i < len(mem.keys); i++ {
+		ret = append(ret, mem.hashMap[mem.keys[i]])
+	}
+
+	return ret
+}
+
+func (mem *MemTable) getSortedRangeMap(minRange, maxRange string) []*record.Record {
+	sort.Strings(mem.keys)
+
+	var ret []*record.Record
+	for i := 0; i < len(mem.keys); i++ {
+		if mem.keys[i] >= minRange && mem.keys[i] <= maxRange {
+			ret = append(ret, mem.hashMap[mem.keys[i]])
+		}
+	}
+	return ret
+}
+
+func (mem *MemTable) getSortedRange(minRange, maxRange string) []*record.Record {
+	if mem.structType == "btree" {
+		return mem.bTree.GetRangeSorted(minRange, maxRange)
+	} else if mem.structType == "skiplist" {
+		return mem.skipList.GetRangeSortedList(minRange, maxRange)
+	}
+	return mem.getSortedRangeMap(minRange, maxRange)
 }
