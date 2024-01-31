@@ -2,6 +2,7 @@ package sstable
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"key-value-engine/structs/bloomFilter"
 	"key-value-engine/structs/merkleTree"
@@ -30,8 +31,16 @@ func (sst *SSTable) makeSingleFileComp(data []*record.Record, dirPath string) er
 	}
 
 	// Writting data
+	globalDict := make(map[string]int)
+	dictIndex := 1
 	for i, rec := range data {
-		recSer := rec.SSTRecordToBytes()
+		_, exists := globalDict[rec.GetKey()]
+		if !exists {
+			globalDict[rec.GetKey()] = dictIndex
+			dictIndex++
+		}
+
+		recSer := rec.SSTRecordToBytes(dictIndex)
 		recSerSizeBytes := make([]byte, binary.MaxVarintLen64)
 		recSizeLen := binary.PutUvarint(recSerSizeBytes, uint64(len(recSer)))
 
@@ -67,7 +76,7 @@ func (sst *SSTable) makeSingleFileComp(data []*record.Record, dirPath string) er
 		}
 
 		// updating offset
-		recSer := rec.SSTRecordToBytes()
+		recSer := rec.SSTRecordToBytes(globalDict[rec.GetKey()])
 		recSerSizeBytes := make([]byte, binary.MaxVarintLen64)
 		recSizeLen := binary.PutUvarint(recSerSizeBytes, uint64(len(recSer)))
 		offsetIndex += len(recSer) + recSizeLen
@@ -168,6 +177,18 @@ func (sst *SSTable) makeSingleFileComp(data []*record.Record, dirPath string) er
 		}
 	}
 
+	marshalled, err := json.MarshalIndent(globalDict, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error converting hashmap to json: %s", err)
+
+	}
+
+	// Write the JSON data to the file
+	err = os.WriteFile(dirPath+string(os.PathSeparator)+GLOBALDICTNAME, marshalled, 0644)
+	if err != nil {
+		return fmt.Errorf("error writing hashmap to file: %s", err)
+	}
+
 	return nil
 }
 
@@ -193,10 +214,10 @@ func (sst *SSTable) checkSingleComp(key string, dirPath string) (*record.Record,
 		binary.LittleEndian.Uint64(headerBytes[4*OFFSETSIZE:]),
 	}
 
-	return sst.checkFilterSingleComp(key, file, header)
+	return sst.checkFilterSingleComp(key, file, header, dirPath)
 }
 
-func (sst *SSTable) checkFilterSingleComp(key string, file *os.File, header []uint64) (*record.Record, error) {
+func (sst *SSTable) checkFilterSingleComp(key string, file *os.File, header []uint64, dirPath string) (*record.Record, error) {
 	_, err := file.Seek(int64(header[3]), 0)
 	if err != nil {
 		return nil, fmt.Errorf("error seeking: %s\n", err)
@@ -217,12 +238,12 @@ func (sst *SSTable) checkFilterSingleComp(key string, file *os.File, header []ui
 	if !bf.IsPresent([]byte(key)) {
 		return nil, nil
 	} else {
-		return sst.checkSummarySingleComp(key, file, header)
+		return sst.checkSummarySingleComp(key, file, header, dirPath)
 	}
 
 }
 
-func (sst *SSTable) checkSummarySingleComp(key string, file *os.File, header []uint64) (*record.Record, error) {
+func (sst *SSTable) checkSummarySingleComp(key string, file *os.File, header []uint64, dirPath string) (*record.Record, error) {
 	_, err := file.Seek(int64(header[2]), 0)
 	if err != nil {
 		return nil, fmt.Errorf("error seeking: %s\n", err)
@@ -271,7 +292,7 @@ func (sst *SSTable) checkSummarySingleComp(key string, file *os.File, header []u
 			return nil, fmt.Errorf("error reading key size: %s\n", err)
 		}
 		if position == int64(header[3]) {
-			return sst.checkIndexSingleComp(key, lastOffset, file, header)
+			return sst.checkIndexSingleComp(key, lastOffset, file, header, dirPath)
 		}
 
 		_, err = file.Read(keySizeBytes)
@@ -298,7 +319,7 @@ func (sst *SSTable) checkSummarySingleComp(key string, file *os.File, header []u
 
 		// checking range
 		if string(readKey) > key {
-			return sst.checkIndexSingleComp(key, lastOffset, file, header)
+			return sst.checkIndexSingleComp(key, lastOffset, file, header, dirPath)
 		} else {
 			// updating lastOffset
 			lastOffset = offset
@@ -307,7 +328,7 @@ func (sst *SSTable) checkSummarySingleComp(key string, file *os.File, header []u
 	}
 }
 
-func (sst *SSTable) checkIndexSingleComp(key string, offset uint64, file *os.File, header []uint64) (*record.Record, error) {
+func (sst *SSTable) checkIndexSingleComp(key string, offset uint64, file *os.File, header []uint64, dirPath string) (*record.Record, error) {
 	_, err := file.Seek(int64(header[1])+int64(offset), 0)
 	if err != nil {
 		return nil, fmt.Errorf("error seeking: %s\n", err)
@@ -351,14 +372,14 @@ func (sst *SSTable) checkIndexSingleComp(key string, offset uint64, file *os.Fil
 			return nil, nil
 		} else if string(readKey) == key {
 			// continue search in Data
-			return sst.checkDataSingleComp(offset, file, header)
+			return sst.checkDataSingleComp(offset, file, header, dirPath)
 		}
 
 	}
 	return nil, nil
 }
 
-func (sst *SSTable) checkDataSingleComp(offset uint64, file *os.File, header []uint64) (*record.Record, error) {
+func (sst *SSTable) checkDataSingleComp(offset uint64, file *os.File, header []uint64, dirPath string) (*record.Record, error) {
 	// seeking to position
 	_, err := file.Seek(int64(header[0])+int64(offset), 0)
 	if err != nil {
@@ -400,7 +421,17 @@ func (sst *SSTable) checkDataSingleComp(offset uint64, file *os.File, header []u
 		return nil, fmt.Errorf("Value not valid!\n")
 	}
 
-	rec, err := record.SSTBytesToRecord(entryBytes)
+	globalDictData, err := os.ReadFile(dirPath + string(os.PathSeparator) + GLOBALDICTNAME)
+	if err != nil {
+		return nil, err
+	}
+	globalDict := make(map[string]int)
+	err = json.Unmarshal(globalDictData, &globalDict)
+	if err != nil {
+		return nil, err
+	}
+
+	rec, err := record.SSTBytesToRecord(entryBytes, &globalDict)
 	if err != nil {
 		return nil, err
 	}

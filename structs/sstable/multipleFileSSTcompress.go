@@ -2,6 +2,7 @@ package sstable
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"key-value-engine/structs/bloomFilter"
@@ -74,13 +75,21 @@ func (sst *SSTable) makeMultipleFilesComp(data []*record.Record, dirPath string)
 		return fmt.Errorf("error writing header: %s\n", err)
 	}
 
+	globalDict := make(map[string]int)
+	dictIndex := 1
 	bf := bloomFilter.MakeBloomFilter(uint64(len(data)), sst.filterProbability)
 	offsetIndex := 0
 	offsetSummary := 0
 	merkleData := make([][]byte, len(data))
 	for i, rec := range data {
+		_, exists := globalDict[rec.GetKey()]
+		if !exists {
+			globalDict[rec.GetKey()] = dictIndex
+			dictIndex++
+		}
+
 		// Making Data
-		sstEntry := rec.SSTRecordToBytes()
+		sstEntry := rec.SSTRecordToBytes(dictIndex)
 		entrySerSizeBytes := make([]byte, binary.MaxVarintLen64)
 		entrySizeLen := binary.PutUvarint(entrySerSizeBytes, uint64(len(sstEntry)))
 
@@ -121,6 +130,7 @@ func (sst *SSTable) makeMultipleFilesComp(data []*record.Record, dirPath string)
 
 		// filling merkleData
 		merkleData[i] = sstEntry
+
 	}
 
 	// writting bloom filter
@@ -140,6 +150,18 @@ func (sst *SSTable) makeMultipleFilesComp(data []*record.Record, dirPath string)
 	_, err = fileMerkle.Write(mtBytes)
 	if err != nil {
 		return fmt.Errorf("error writing bloom filter to Filter: %s\n", err)
+	}
+
+	marshalled, err := json.MarshalIndent(globalDict, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error converting hashmap to json: %s", err)
+
+	}
+
+	// Write the JSON data to the file
+	err = os.WriteFile(dirPath+string(os.PathSeparator)+GLOBALDICTNAME, marshalled, 0644)
+	if err != nil {
+		return fmt.Errorf("error writing hashmap to file: %s", err)
 	}
 
 	return nil
@@ -345,6 +367,15 @@ func (sst *SSTable) checkDataComp(offset uint64, subdirPath string) (*record.Rec
 
 	entryBytes := make([]byte, entrySize)
 
+	globalDictData, err := os.ReadFile(subdirPath + string(os.PathSeparator) + GLOBALDICTNAME)
+	if err != nil {
+		return nil, err
+	}
+	globalDict := make(map[string]int)
+	err = json.Unmarshal(globalDictData, &globalDict)
+	if err != nil {
+		return nil, err
+	}
 	_, err = file.Read(entryBytes)
 	if err != nil {
 		return nil, fmt.Errorf("error reading filter: %s\n", err)
@@ -359,7 +390,7 @@ func (sst *SSTable) checkDataComp(offset uint64, subdirPath string) (*record.Rec
 		return nil, fmt.Errorf("Value not valid!\n")
 	}
 
-	rec, err := record.SSTBytesToRecord(entryBytes)
+	rec, err := record.SSTBytesToRecord(entryBytes, &globalDict)
 	if err != nil {
 		return nil, err
 	}

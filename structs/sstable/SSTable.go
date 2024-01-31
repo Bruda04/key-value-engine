@@ -15,6 +15,7 @@ const (
 	BLOOMNAME      = "SST_Filter.db"
 	TOCNAME        = "TOC.csv"
 	MERKLENAME     = "SST_Merkle.db"
+	GLOBALDICTNAME = "SST_Dict.json"
 	SINGLEFILENAME = "SST.db"
 	OFFSETSIZE     = 8
 )
