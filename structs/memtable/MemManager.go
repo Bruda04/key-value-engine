@@ -2,6 +2,7 @@ package memtable
 
 import (
 	"fmt"
+	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/record"
 )
 
@@ -110,4 +111,14 @@ func (mm *MemManager) RangeScanMem(min_range string, max_range string) []*record
 		ret = append(ret, mm.tables[i].getSortedRange(min_range, max_range)...)
 	}
 	return ret
+}
+
+func (mm *MemManager) GetMemIterators(minRange, maxRange string) []iterator.Iterator {
+	var memIterators []iterator.Iterator
+
+	for i := 0; i < mm.maxTables; i++ {
+		memIterators = append(memIterators, mm.tables[i].GetIterator(minRange, maxRange))
+	}
+
+	return memIterators
 }

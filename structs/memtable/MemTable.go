@@ -171,7 +171,7 @@ func (mem *MemTable) getSortedRange(minRange, maxRange string) []*record.Record 
 
 func (mem *MemTable) GetIterator(minRange, maxRange string) iterator.Iterator {
 	if mem.structType == "btree" {
-		return mem.bTree.NewRangeIterator(minRange, maxRange)
+		return mem.bTree.NewBTreeIterator(minRange, maxRange)
 	} else if mem.structType == "skiplist" {
 		return mem.skipList.NewSkipListIterator(minRange, maxRange)
 	}
