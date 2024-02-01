@@ -1,88 +1,86 @@
-// btree_iterator.go
 package btree
 
 import (
 	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/record"
+	"strings"
 )
 
 // BTreeIterator is a custom iterator for your B-tree.
+// BTreeIterator represents an iterator for traversing a B-tree in sorted order.
 type BTreeIterator struct {
-	btree    *BTree
-	current  *record.Record
-	minRange string
-	maxRange string
+	btree         *BTree
+	node          *bTreeNode
+	index         int
+	keys          []*record.Record
+	position      int
+	minRange      string
+	maxRange      string
+	prefix        string
+	rangeIterator bool
 }
 
-// NewBTreeIterator creates a new iterator for the given B-tree.
-func (bt *BTree) NewBTreeIterator(minRange, maxRange string) iterator.Iterator {
-	it := &BTreeIterator{
-		btree:    bt,
-		current:  nil,
-		minRange: minRange,
-		maxRange: maxRange,
+// NewBTreeRangeIterator creates a new iterator for the given B-tree.
+func (bt *BTree) NewBTreeRangeIterator(minRange, maxRange string) iterator.Iterator {
+	keys := make([]*record.Record, 0)
+	keys = bt.innerSorted(nil, keys)
+
+	index := 0
+	for index < len(keys) && keys[index].GetKey() < minRange {
+		index++
 	}
-	it.seekToFirst()
-	return it
+
+	return &BTreeIterator{
+		btree:         bt,
+		node:          nil,
+		index:         0,
+		keys:          keys,
+		position:      index,
+		minRange:      minRange,
+		maxRange:      maxRange,
+		rangeIterator: true,
+	}
 }
 
-// seekToFirst moves the iterator to the first valid element.
-func (it *BTreeIterator) seekToFirst() {
-	node := it.btree.root
-	for !node.leaf {
-		node = node.children[0]
+// NewBTreePrefixIterator creates a new iterator for the given B-tree.
+func (bt *BTree) NewBTreePrefixIterator(prefix string) iterator.Iterator {
+	keys := make([]*record.Record, 0)
+	keys = bt.GetSorted()
+	keys = bt.innerSorted(nil, keys)
+
+	index := 0
+	for index < len(keys) && !strings.HasPrefix(keys[index].GetKey(), prefix) {
+		index++
 	}
-	it.findFirstInRange(node)
+
+	return &BTreeIterator{
+		btree:         bt,
+		node:          nil,
+		index:         0,
+		keys:          keys,
+		position:      index,
+		prefix:        prefix,
+		rangeIterator: false,
+	}
 }
 
-// findFirstInRange finds the first valid element within the specified range in a leaf node.
-func (it *BTreeIterator) findFirstInRange(node *bTreeNode) {
-	for _, key := range node.keys {
-		if key.GetKey() >= it.minRange && key.GetKey() <= it.maxRange {
-			it.current = key
-			return
-		}
-	}
-	it.current = nil
+func (iter *BTreeIterator) Valid() bool {
+	return iter.position < len(iter.keys) && iter.checkStopCondition()
 }
 
-// Valid checks if the iterator is in a valid state.
-func (it *BTreeIterator) Valid() bool {
-	return it.current != nil && it.current.GetKey() <= it.maxRange
+func (iter *BTreeIterator) Next() {
+	iter.position++
 }
 
-// Next moves the iterator to the next element.
-func (it *BTreeIterator) Next() {
-	if it.current == nil {
-		return
-	}
+func (iter *BTreeIterator) Get() *record.Record {
+	return iter.keys[iter.position]
+}
 
-	node := it.btree.root
-	for !node.leaf {
-		i := 0
-		for i < len(node.keys) && it.current.GetKey() > node.keys[i].GetKey() {
-			i++
-		}
-		if i < len(node.keys) && it.current.GetKey() == node.keys[i].GetKey() {
-			node = node.children[i+1]
-		} else {
-			node = node.children[i]
-		}
-	}
-
-	i := 0
-	for i < len(node.keys) && it.current.GetKey() >= node.keys[i].GetKey() {
-		i++
-	}
-
-	if i < len(node.keys) {
-		it.current = node.keys[i]
+func (iter *BTreeIterator) checkStopCondition() bool {
+	if iter.rangeIterator {
+		return iter.keys[iter.position].GetKey() <= iter.maxRange
 	} else {
-		it.current = nil
+		return strings.HasPrefix(iter.keys[iter.position].GetKey(), iter.prefix)
 	}
-}
 
-// Get returns the record at the current iterator position.
-func (it *BTreeIterator) Get() *record.Record {
-	return it.current
 }

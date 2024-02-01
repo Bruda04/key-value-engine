@@ -209,35 +209,3 @@ func (bt *BTree) innerSorted(n *bTreeNode, slice []*record.Record) []*record.Rec
 
 	return slice
 }
-
-func (bt *BTree) GetRangeSorted(minRange, maxRange string) []*record.Record {
-	ret := make([]*record.Record, 0)
-	ret = bt.innerRangeSorted(nil, ret, minRange, maxRange)
-
-	return ret
-}
-
-func (bt *BTree) innerRangeSorted(n *bTreeNode, slice []*record.Record, minRange, maxRange string) []*record.Record {
-	if n == nil {
-		n = bt.root
-	}
-
-	if n.leaf {
-		for i := 0; i < len(n.keys); i++ {
-			if n.keys[i].GetKey() >= minRange && n.keys[i].GetKey() <= maxRange {
-				slice = append(slice, n.keys[i])
-			}
-		}
-	}
-
-	for i := 0; i < len(n.children); i++ {
-		slice = bt.innerRangeSorted(n.children[i], slice, minRange, maxRange)
-		if i < len(n.keys) {
-			if n.keys[i].GetKey() >= minRange && n.keys[i].GetKey() <= maxRange {
-				slice = append(slice, n.keys[i])
-			}
-		}
-	}
-
-	return slice
-}
