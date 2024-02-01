@@ -2,6 +2,7 @@ package memtable
 
 import (
 	"key-value-engine/structs/btree"
+	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/record"
 	"key-value-engine/structs/skipList"
 	"sort"
@@ -166,4 +167,14 @@ func (mem *MemTable) getSortedRange(minRange, maxRange string) []*record.Record 
 		return mem.skipList.GetRangeSortedList(minRange, maxRange)
 	}
 	return mem.getSortedRangeMap(minRange, maxRange)
+}
+
+func (mem *MemTable) GetIterator(minRange, maxRange string) iterator.Iterator {
+	if mem.structType == "btree" {
+		return mem.bTree.NewRangeIterator(minRange, maxRange)
+	} else if mem.structType == "skiplist" {
+		return mem.skipList.NewSkipListIterator(minRange, maxRange)
+	}
+	//implement hashmap iterator
+	return mem.NewMapIterator(minRange, maxRange)
 }
