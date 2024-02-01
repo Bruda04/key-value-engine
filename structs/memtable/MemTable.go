@@ -19,33 +19,16 @@ type MemTable struct {
 	keys        []string
 }
 
-// In case of incorrectly passed values creates default memtable/*
-func MakeDefaultMemtable() (mem *MemTable) {
-	return &MemTable{
-		maxCapacity: 100,
-		capacity:    0,
-		structType:  "skiplist",
-		bTree:       nil,
-		skipList:    skipList.MakeSkipList(100),
-		hashMap:     nil,
-		keys:        nil,
-	}
-}
-
 /*
-Initialize Memtable
+MakeMemTable
+-how many elements we want each table to contain
+-structures to be used for implementation
 
-	-how many elements we want each table to contain
-	-structures to be used for implementation
-		-btree
-		-skiplist
-		-hashmap
+	-btree
+	-skiplist
+	-hashmap
 */
 func MakeMemTable(maxCapacity int, structType string) *MemTable {
-	if maxCapacity <= 0 {
-		return MakeDefaultMemtable()
-	}
-
 	if structType == "btree" {
 		bTree, _ := btree.MakeBTree(maxCapacity)
 		return &MemTable{
@@ -67,7 +50,7 @@ func MakeMemTable(maxCapacity int, structType string) *MemTable {
 			hashMap:     nil,
 			keys:        nil,
 		}
-	} else if structType == "hashmap" {
+	} else { //structType == "hashmap"
 		return &MemTable{
 			maxCapacity: maxCapacity,
 			capacity:    0,
@@ -77,8 +60,6 @@ func MakeMemTable(maxCapacity int, structType string) *MemTable {
 			hashMap:     make(map[string]*record.Record),
 			keys:        []string{},
 		}
-	} else {
-		return MakeDefaultMemtable()
 	}
 }
 
@@ -107,7 +88,7 @@ func (mem *MemTable) Find(key string) bool {
 	}
 }
 
-// Supports replace
+// Put - adds elements (if need be, replaces)
 func (mem *MemTable) Put(rec *record.Record) {
 	if mem.structType == "btree" {
 		mem.bTree.Insert(rec)
@@ -134,9 +115,30 @@ func (mem *MemTable) GetSorted() []*record.Record {
 	} else if mem.structType == "skiplist" {
 		return mem.skipList.GetSortedList()
 	}
-	return mem.getSortedMap()
+	return mem.getSortedMap() //hashmap
 }
 
+func (mem *MemTable) GetRangeIterator(minRange, maxRange string) iterator.Iterator {
+	if mem.structType == "btree" {
+		return mem.bTree.NewBTreeRangeIterator(minRange, maxRange)
+	} else if mem.structType == "skiplist" {
+		return mem.skipList.NewSkipListRangeIterator(minRange, maxRange)
+	}
+	//implement hashmap iterator
+	return mem.NewMapRangeIterator(minRange, maxRange)
+}
+
+func (mem *MemTable) GetPrefixIterator(prefix string) iterator.Iterator {
+	if mem.structType == "btree" {
+		return mem.bTree.NewBTreePrefixIterator(prefix)
+	} else if mem.structType == "skiplist" {
+		return mem.skipList.NewSkipListPrefixIterator(prefix)
+	}
+	//implement hashmap iterator
+	return mem.NewMapPrefixIterator(prefix)
+}
+
+// getSortedMap returns sorted hashmap
 func (mem *MemTable) getSortedMap() []*record.Record {
 	sort.Strings(mem.keys)
 
@@ -146,35 +148,4 @@ func (mem *MemTable) getSortedMap() []*record.Record {
 	}
 
 	return ret
-}
-
-func (mem *MemTable) getSortedRangeMap(minRange, maxRange string) []*record.Record {
-	sort.Strings(mem.keys)
-
-	var ret []*record.Record
-	for i := 0; i < len(mem.keys); i++ {
-		if mem.keys[i] >= minRange && mem.keys[i] <= maxRange {
-			ret = append(ret, mem.hashMap[mem.keys[i]])
-		}
-	}
-	return ret
-}
-
-func (mem *MemTable) getSortedRange(minRange, maxRange string) []*record.Record {
-	if mem.structType == "btree" {
-		return mem.bTree.GetRangeSorted(minRange, maxRange)
-	} else if mem.structType == "skiplist" {
-		return mem.skipList.GetRangeSortedList(minRange, maxRange)
-	}
-	return mem.getSortedRangeMap(minRange, maxRange)
-}
-
-func (mem *MemTable) GetIterator(minRange, maxRange string) iterator.Iterator {
-	if mem.structType == "btree" {
-		return mem.bTree.NewBTreeIterator(minRange, maxRange)
-	} else if mem.structType == "skiplist" {
-		return mem.skipList.NewSkipListIterator(minRange, maxRange)
-	}
-	//implement hashmap iterator
-	return mem.NewMapIterator(minRange, maxRange)
 }

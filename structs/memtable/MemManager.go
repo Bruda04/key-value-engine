@@ -25,29 +25,7 @@ Initialize Memtable Manager
 		-hashmap
 */
 
-func NewDefaultMemTableManager() *MemManager {
-	DEAFULTMEMTABLES := 5
-
-	tables := make([]*MemTable, DEAFULTMEMTABLES)
-	for i := 0; i < 5; i++ {
-		tables[i] = MakeDefaultMemtable()
-	}
-
-	return &MemManager{
-		currentTable: tables[0],
-		tables:       tables,
-		currentIndex: 0,
-		maxTables:    DEAFULTMEMTABLES,
-		initialFill:  false, //initial round of tables hasn't been filled
-	}
-}
-
-func NewMemTableManager(maxTables int, maxCapacity int, structType string) *MemManager {
-	// Create initial MemTables
-	if maxTables <= 0 || maxCapacity <= 0 {
-		return NewDefaultMemTableManager()
-	}
-
+func MakeMemTableManager(maxTables int, maxCapacity int, structType string) *MemManager {
 	tables := make([]*MemTable, maxTables)
 	for i := 0; i < maxTables; i++ {
 		tables[i] = MakeMemTable(maxCapacity, structType)
@@ -62,7 +40,7 @@ func NewMemTableManager(maxTables int, maxCapacity int, structType string) *MemM
 	}
 }
 
-// flush oldest memtable/create sstable/flush wal
+// FlushMem flush oldest memtable/create sstable/flush wal
 func (mm *MemManager) FlushMem() {
 	//create sst
 	mm.currentTable.Clear()
@@ -79,7 +57,7 @@ func (mm *MemManager) SwitchTable() {
 	mm.currentTable = mm.tables[mm.currentIndex]
 }
 
-// add new element to the current memtable
+// PutMem add new element to the current memtable
 func (mm *MemManager) PutMem(rec *record.Record) {
 	mm.currentTable.Put(rec)
 
@@ -95,7 +73,7 @@ func (mm *MemManager) GetCurrentTable() *MemTable {
 	return mm.currentTable
 }
 
-// find if element exists in any of the memtables
+// FindInMem find if element exists in any of the memtables
 func (mm *MemManager) FindInMem(key string) bool {
 	for i := 0; i < mm.maxTables; i++ {
 		if mm.tables[i].Find(key) {
@@ -105,19 +83,21 @@ func (mm *MemManager) FindInMem(key string) bool {
 	return false
 }
 
-func (mm *MemManager) RangeScanMem(min_range string, max_range string) []*record.Record {
-	var ret []*record.Record
-	for i := 0; i < mm.maxTables; i++ {
-		ret = append(ret, mm.tables[i].getSortedRange(min_range, max_range)...)
-	}
-	return ret
-}
-
-func (mm *MemManager) GetMemIterators(minRange, maxRange string) []iterator.Iterator {
+func (mm *MemManager) GetMemRangeIterators(minRange, maxRange string) []iterator.Iterator {
 	var memIterators []iterator.Iterator
 
 	for i := 0; i < mm.maxTables; i++ {
-		memIterators = append(memIterators, mm.tables[i].GetIterator(minRange, maxRange))
+		memIterators = append(memIterators, mm.tables[i].GetRangeIterator(minRange, maxRange))
+	}
+
+	return memIterators
+}
+
+func (mm *MemManager) GetMemPrefixIterators(prefix string) []iterator.Iterator {
+	var memIterators []iterator.Iterator
+
+	for i := 0; i < mm.maxTables; i++ {
+		memIterators = append(memIterators, mm.tables[i].GetPrefixIterator(prefix))
 	}
 
 	return memIterators
