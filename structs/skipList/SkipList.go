@@ -17,6 +17,18 @@ func newNode(record *record.Record, level int) *Node {
 	}
 }
 
+func (s *SkipList) Head() *Node {
+	return s.head
+}
+
+func (n *Node) GetNext() []*Node {
+	return n.next
+}
+
+func (n *Node) GetValue() *record.Record {
+	return n.value
+}
+
 type SkipList struct {
 	maxHeight int
 	head      *Node
@@ -140,6 +152,20 @@ func (s *SkipList) GetSortedList() []*record.Record {
 
 	for current != nil {
 		sortedList = append(sortedList, current.value)
+		current = current.next[0]
+	}
+
+	return sortedList
+}
+
+func (s *SkipList) GetRangeSortedList(minRange, maxRange string) []*record.Record {
+	var sortedList []*record.Record
+	current := s.head.next[0]
+
+	for current != nil {
+		if current.value.GetKey() >= minRange && current.value.GetKey() <= maxRange {
+			sortedList = append(sortedList, current.value)
+		}
 		current = current.next[0]
 	}
 
