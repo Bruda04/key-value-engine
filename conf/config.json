@@ -1,0 +1,16 @@
+{
+  "wal_size": 20,
+  "memtable_size": 20,
+  "memtable_count": 5,
+  "memtable_structure": "btree",
+  "btree_degree": 4,
+  "skip_list_max_height": 20,
+  "cahce_size": 5,
+  "summary_index_density": 5,
+  "do_compression": false,
+  "compression_tyoe": "size-tiered",
+  "max_lsm_levels": 10,
+  "tables_to_compress": 5,
+  "token-capacity": 10,
+  "refill-cooldown": 60
+}

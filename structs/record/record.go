@@ -2,6 +2,7 @@ package record
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"time"
@@ -209,35 +210,64 @@ Returns:
   - []byte: A byte slice representing the serialized form of the Record.
 
 The function distinguishes between regular records and tombstone records.
-If the record is not a tombstone, it delegates the conversion to the RecordToBytes function.
 */
-func (r *Record) SSTRecordToBytes() []byte {
+func (r *Record) SSTRecordToBytes(dictIndex int) []byte {
 	if !r.tombstone {
-		return r.RecordToBytes()
+		crcBytes := make([]byte, binary.MaxVarintLen64)
+		binary.PutUvarint(crcBytes, uint64(r.crc))
+		encodedSize := binary.PutUvarint(crcBytes, uint64(r.crc))
+		crcBytes = crcBytes[:encodedSize]
+
+		timestampBytes := make([]byte, binary.MaxVarintLen64)
+		encodedSize = binary.PutUvarint(timestampBytes, r.timestamp)
+		timestampBytes = timestampBytes[:encodedSize]
+
+		tombstoneBytes := []byte{0}
+		if r.tombstone {
+			tombstoneBytes[0] = 1
+		}
+
+		keyIndexBytes := make([]byte, binary.MaxVarintLen64)
+		encodedSize = binary.PutUvarint(keyIndexBytes, uint64(dictIndex))
+		keyIndexBytes = keyIndexBytes[:encodedSize]
+
+		valueSizeBytes := make([]byte, binary.MaxVarintLen64)
+		encodedSize = binary.PutUvarint(valueSizeBytes, r.valueSize)
+		valueSizeBytes = valueSizeBytes[:encodedSize]
+
+		valueBytes := r.value
+
+		result := append(crcBytes, timestampBytes...)
+		result = append(result, tombstoneBytes...)
+		result = append(result, keyIndexBytes...)
+		result = append(result, valueSizeBytes...)
+		result = append(result, valueBytes...)
+
+		return result
+	} else {
+		crcBytes := make([]byte, binary.MaxVarintLen64)
+		encodedSize := binary.PutUvarint(crcBytes, uint64(r.crc))
+		crcBytes = crcBytes[:encodedSize]
+
+		timestampBytes := make([]byte, binary.MaxVarintLen64)
+		encodedSize = binary.PutUvarint(timestampBytes, r.timestamp)
+		timestampBytes = timestampBytes[:encodedSize]
+
+		tombstoneBytes := []byte{0}
+		if r.tombstone {
+			tombstoneBytes[0] = 1
+		}
+
+		keyIndexBytes := make([]byte, binary.MaxVarintLen64)
+		encodedSize = binary.PutUvarint(keyIndexBytes, uint64(dictIndex))
+		keyIndexBytes = keyIndexBytes[:encodedSize]
+
+		result := append(crcBytes, timestampBytes...)
+		result = append(result, tombstoneBytes...)
+		result = append(result, keyIndexBytes...)
+
+		return result
 	}
-
-	crcBytes := make([]byte, CRC_SIZE)
-	binary.LittleEndian.PutUint32(crcBytes, r.crc)
-
-	timestampBytes := make([]byte, TIMESTAMP_SIZE)
-	binary.LittleEndian.PutUint64(timestampBytes, r.timestamp)
-
-	tombstoneBytes := []byte{0}
-	if r.tombstone {
-		tombstoneBytes[0] = 1
-	}
-
-	keySizeBytes := make([]byte, KEY_SIZE_SIZE)
-	binary.LittleEndian.PutUint64(keySizeBytes, r.keySize)
-
-	keyBytes := []byte(r.key)
-
-	result := append(crcBytes, timestampBytes...)
-	result = append(result, tombstoneBytes...)
-	result = append(result, keySizeBytes...)
-	result = append(result, keyBytes...)
-
-	return result
 }
 
 /*
@@ -250,32 +280,70 @@ Returns:
   - *Record: Pointer to a Record instance initialized with the data from the byte slice.
 
 The function distinguishes between regular records and tombstone records by checking
-the value at the TOMBSTONE_START position in the byte slice. If it's 1, indicating a tombstone,
-it creates a Record instance with tombstone information, otherwise, it delegates the conversion
-to the BytesToRecord function.
+the value at the TOMBSTONE_START position in the byte slice.
 */
-func SSTBytesToRecord(bytes []byte) *Record {
-	tombstone := bytes[TOMBSTONE_START] == 1
+func SSTBytesToRecord(data []byte, globalDict *map[string]int) (*Record, error) {
+	// Read and decode the CRC
+	crc, n := binary.Uvarint(data)
+	if n <= 0 {
+		return nil, errors.New("failed to decode")
+	}
+	data = data[n:]
 
-	if !tombstone {
-		return BytesToRecord(bytes)
+	// Read and decode the timestamp
+	timestamp, n := binary.Uvarint(data)
+	if n <= 0 {
+		return nil, errors.New("failed to decode")
+	}
+	data = data[n:]
+
+	// Read and decode the tombstone flag
+	tombstone := data[0] == 1
+	data = data[1:]
+
+	// Read and decode the key size
+	keyIndex, n := binary.Uvarint(data)
+	if n <= 0 {
+		return nil, errors.New("failed to decode")
+	}
+	data = data[n:]
+
+	key := ""
+	for k, v := range *globalDict {
+		if v == int(keyIndex) {
+			key = k
+			break
+		}
 	}
 
-	r := Record{}
+	if tombstone {
+		return &Record{
+			crc:       uint32(crc),
+			timestamp: timestamp,
+			tombstone: tombstone,
+			keySize:   uint64(len(key)),
+			key:       key,
+		}, nil
+	}
 
-	r.tombstone = tombstone
+	// Read and decode the value size
+	valueSize, n := binary.Uvarint(data)
+	if n <= 0 {
+		return nil, errors.New("failed to decode")
+	}
+	data = data[n:]
 
-	r.crc = binary.LittleEndian.Uint32(bytes[CRC_START:TIMESTAMP_START])
+	// Read the value bytes
+	value := data[:valueSize]
 
-	r.timestamp = binary.LittleEndian.Uint64(bytes[TIMESTAMP_START:TOMBSTONE_START])
+	return &Record{
+		crc:       uint32(crc),
+		timestamp: timestamp,
+		tombstone: tombstone,
+		keySize:   uint64(len(key)),
+		valueSize: valueSize,
+		key:       key,
+		value:     value,
+	}, nil
 
-	r.keySize = binary.LittleEndian.Uint64(bytes[KEY_SIZE_START:VALUE_SIZE_START])
-
-	r.valueSize = 0
-
-	r.key = string(bytes[VALUE_SIZE_START : VALUE_SIZE_START+r.keySize])
-
-	r.value = make([]byte, 0)
-
-	return &r
 }
