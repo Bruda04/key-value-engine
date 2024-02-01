@@ -40,5 +40,13 @@ func (rit *RangeIterator) Next() *record.Record {
 	if incrementId != -1 {
 		rit.iterators[incrementId].Next()
 	}
+
+	if ret == nil {
+		rit.Stop()
+	}
 	return ret
+}
+
+func (rit *RangeIterator) Stop() {
+	rit.iterators = nil
 }
