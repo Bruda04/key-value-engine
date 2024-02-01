@@ -6,17 +6,17 @@ import (
 )
 
 /*
-RangeScan
+PrefixScan
 Accepts:
 
-	the range in which the found keys should be
+	the prefix which the found keys should have
 	page number on which we want the values
 	page size, how many records are written per page
 	memmanager - in order to extract memtable iterators
 	sstable /manager - in order to extract sstable iterators
 */
-func RangeScan(minRange, maxRange string, pageNumber, pageSize int, mm *memtable.MemManager) []*record.Record {
-	rit := MakeRangeIterate(minRange, maxRange, mm)
+func PrefixScan(prefix string, pageNumber, pageSize int, mm *memtable.MemManager) []*record.Record {
+	rit := MakePrefixIterate(prefix, mm)
 	var lista []*record.Record
 	var current *record.Record
 

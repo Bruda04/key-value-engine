@@ -6,37 +6,29 @@ import (
 	"key-value-engine/structs/record"
 )
 
-/*
-MAIN EXAMPLE:
-	rit := scan.MakeRangeIterateMem("a", "f", mm)
-	fmt.Println(rit.Next().GetKey())
-	fmt.Println(rit.Next().GetKey())
-
-*/
-
-type RangeIterator struct {
+type PrefixIterator struct {
 	iterators []iterator.Iterator
 }
 
 /*
-MakeRangeIterate
+MakePrefixIterate
 FOR SSTABLE JUST ADD ITS ITERATORS TO THE ITERATORS, and pass sst manager
 
-	Accepts the range within the key values should be
+	Accepts the prefix the key values should have
 	memmanager - in order to extract memtable iterators
 	sstable /manager - in order to extract sstable iterators
 */
-func MakeRangeIterate(minRange, maxRange string, manager *memtable.MemManager) *RangeIterator {
-	return &RangeIterator{
-		manager.GetMemRangeIterators(minRange, maxRange),
+func MakePrefixIterate(prefix string, manager *memtable.MemManager) *PrefixIterator {
+	return &PrefixIterator{
+		manager.GetMemPrefixIterators(prefix),
 	}
 }
 
-func (rit *RangeIterator) Next() *record.Record {
+func (pit *PrefixIterator) Next() *record.Record {
 	var ret *record.Record
 
 	incrementId := -1
-	for id, it := range rit.iterators {
+	for id, it := range pit.iterators {
 		if it.Valid() {
 			//can also be replaced if == because it might be a newer version
 			if ret == nil || (it.Get().GetKey() <= ret.GetKey() && !it.Get().IsTombstone()) {
@@ -55,15 +47,15 @@ func (rit *RangeIterator) Next() *record.Record {
 		}
 	}
 	if incrementId != -1 {
-		rit.iterators[incrementId].Next()
+		pit.iterators[incrementId].Next()
 	}
 
 	if ret == nil {
-		rit.Stop()
+		pit.Stop()
 	}
 	return ret
 }
 
-func (rit *RangeIterator) Stop() {
-	rit.iterators = nil
+func (pit *PrefixIterator) Stop() {
+	pit.iterators = nil
 }
