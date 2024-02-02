@@ -172,6 +172,7 @@ func (sst *SSTable) getIteratorDirs() []string {
 			subdir := tiers[i][j]
 
 			singleSSTPath = append(singleSSTPath, subdir)
+
 		}
 	}
 
