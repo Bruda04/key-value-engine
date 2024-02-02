@@ -3,6 +3,7 @@ package scan
 import (
 	"key-value-engine/structs/memtable"
 	"key-value-engine/structs/record"
+	"key-value-engine/structs/sstable"
 )
 
 /*
@@ -15,8 +16,8 @@ Accepts:
 	memmanager - in order to extract memtable iterators
 	sstable /manager - in order to extract sstable iterators
 */
-func PrefixScan(prefix string, pageNumber, pageSize int, mm *memtable.MemManager) []*record.Record {
-	rit := MakePrefixIterate(prefix, mm)
+func PrefixScan(prefix string, pageNumber, pageSize int, mm *memtable.MemManager, sst *sstable.SSTable) []*record.Record {
+	rit := MakePrefixIterate(prefix, mm, sst)
 	var lista []*record.Record
 	var current *record.Record
 

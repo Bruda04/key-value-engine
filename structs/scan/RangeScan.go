@@ -3,6 +3,7 @@ package scan
 import (
 	"key-value-engine/structs/memtable"
 	"key-value-engine/structs/record"
+	"key-value-engine/structs/sstable"
 )
 
 /*
@@ -15,8 +16,8 @@ Accepts:
 	memmanager - in order to extract memtable iterators
 	sstable /manager - in order to extract sstable iterators
 */
-func RangeScan(minRange, maxRange string, pageNumber, pageSize int, mm *memtable.MemManager) []*record.Record {
-	rit := MakeRangeIterate(minRange, maxRange, mm)
+func RangeScan(minRange, maxRange string, pageNumber, pageSize int, mm *memtable.MemManager, sst *sstable.SSTable) []*record.Record {
+	rit := MakeRangeIterate(minRange, maxRange, mm, sst)
 	var lista []*record.Record
 	var current *record.Record
 
