@@ -3,6 +3,7 @@ package sstable
 import (
 	"encoding/json"
 	"fmt"
+	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/record"
 	"os"
 )
@@ -23,14 +24,17 @@ const (
 )
 
 type SSTable struct {
-	nextIndex         int
-	summaryFactor     int
-	multipleFiles     bool
-	compression       bool
-	filterProbability float64
+	nextIndex          int
+	summaryFactor      int
+	multipleFiles      bool
+	compression        bool
+	filterProbability  float64
+	maxLSMLevels       int
+	tablesToCompress   int    // when there's n sstables on the same level, compress them
+	compressionTypeLSM string // size-tiered or leveled
 }
 
-func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float64, compress bool) (*SSTable, error) {
+func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float64, compress bool, maxLSMLevels int, tablesToCompress int, compressionType string) (*SSTable, error) {
 	if _, err := os.Stat(DIRECTORY); os.IsNotExist(err) {
 		if err := os.MkdirAll(DIRECTORY, 0755); err != nil {
 			return nil, fmt.Errorf("error creating sstable directory: %s", err)
@@ -45,43 +49,45 @@ func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float6
 	count := len(subdirs) + 1
 
 	return &SSTable{
-		nextIndex:         count,
-		summaryFactor:     summaryFactor,
-		multipleFiles:     multipleFiles,
-		filterProbability: filterProbability,
-		compression:       compress,
+		nextIndex:          count,
+		summaryFactor:      summaryFactor,
+		multipleFiles:      multipleFiles,
+		filterProbability:  filterProbability,
+		compression:        compress,
+		maxLSMLevels:       maxLSMLevels,
+		tablesToCompress:   tablesToCompress,
+		compressionTypeLSM: compressionType,
 	}, nil
 }
 
 func (sst *SSTable) Get(key string) (*record.Record, error) {
-	subdirs, err := getSubdirs(DIRECTORY)
+	tiers, err := sst.getDirsByTier()
 	if err != nil {
 		return nil, err
 	}
 
 	// looping backwards
-	for i := len(subdirs) - 1; i >= 0; i-- {
-		subdir := subdirs[i]
-		subdirPath := DIRECTORY + string(os.PathSeparator) + subdir + string(os.PathSeparator)
+	for i := 0; i < len(tiers); i++ {
+		for j := len(tiers[i]) - 1; j >= 0; j-- {
+			subdir := tiers[i][j]
 
-		found, err := sst.checkBf(key, subdirPath)
-		if err != nil {
-			return nil, err
+			found, err := sst.checkBf(key, subdir)
+			if err != nil {
+				return nil, err
+			}
+
+			if found != nil {
+				return found, nil
+			}
 		}
-
-		if found != nil {
-			return found, nil
-		}
-
 	}
 
 	return nil, nil
-
 }
 
 func (sst *SSTable) Flush(data []*record.Record) error {
 	// making directory for SSTable
-	dirPath := SUBDIR + "SST_" + fmt.Sprintf("%d", sst.nextIndex)
+	dirPath := SUBDIR + "C1_SST_" + fmt.Sprintf("%d", sst.nextIndex)
 	err := os.Mkdir(dirPath, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("error making SST direcory: %s\n", err)
@@ -127,5 +133,47 @@ func (sst *SSTable) Flush(data []*record.Record) error {
 		return err
 	}
 
+	sst.Compress()
 	return nil
+}
+
+// --------------------------FOR ITERATORS
+func (sst *SSTable) GetSSTRangeIterators(minRange, maxRange string) []iterator.Iterator {
+	var sstIterators []iterator.Iterator
+
+	for _, path := range sst.getIteratorDirs() {
+		sstIterators = append(sstIterators, sst.NewSSTRangeIterator(minRange, maxRange, path))
+	}
+
+	return sstIterators
+}
+
+func (sst *SSTable) GetSSTPrefixIterators(prefix string) []iterator.Iterator {
+	var sstIterators []iterator.Iterator
+
+	for _, path := range sst.getIteratorDirs() {
+		sstIterators = append(sstIterators, sst.NewSSTPrefixIterator(prefix, path))
+	}
+
+	return sstIterators
+}
+
+func (sst *SSTable) getIteratorDirs() []string {
+	var singleSSTPath []string
+
+	tiers, err := sst.getDirsByTier()
+	if err != nil {
+		return nil
+	}
+
+	// looping backwards
+	for i := 0; i < len(tiers); i++ {
+		for j := len(tiers[i]) - 1; j >= 0; j-- {
+			subdir := tiers[i][j]
+
+			singleSSTPath = append(singleSSTPath, subdir)
+		}
+	}
+
+	return singleSSTPath
 }
