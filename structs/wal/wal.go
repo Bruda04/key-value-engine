@@ -1,4 +1,4 @@
-package main
+package wal
 
 import (
 	"encoding/binary"
@@ -111,8 +111,7 @@ Parameters:
 Returns:
 - error: Error, if any, during the record addition process.
 */
-func (wal *WAL) AddRecord(key string, value []byte, deleted bool) error {
-	rec := record.MakeRecord(key, value, deleted)
+func (wal *WAL) AddRecord(rec *record.Record) error {
 	recordBytes := rec.RecordToBytes()
 
 	filePath := wal.SegmentFiles[len(wal.SegmentFiles)-1]
