@@ -35,8 +35,11 @@ func (pit *PrefixIterator) Next() *record.Record {
 				if ret != nil && ret.GetKey() == it.Get().GetKey() {
 					//if they're duplicates only replace it if its newer
 					if ret.GetTimestamp() > it.Get().GetTimestamp() {
+						pit.iterators[incrementId].Next() //if ret had an old version skip it, so it doesnt appear in next round
 						ret = it.Get()
 						incrementId = id
+					} else {
+						it.Next() //if ret had the good version, skip the old you found, so it doesnt appear again next round
 					}
 				} else {
 					ret = it.Get()
