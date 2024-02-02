@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/record"
+	"key-value-engine/structs/sstable"
 )
 
 type MemManager struct {
 	currentTable *MemTable
 	tables       []*MemTable
+	sstmanager   *sstable.SSTable
 	currentIndex int
 	maxTables    int
 	initialFill  bool
@@ -25,7 +27,7 @@ Initialize Memtable Manager
 		-hashmap
 */
 
-func MakeMemTableManager(maxTables int, maxCapacity int, structType string) *MemManager {
+func MakeMemTableManager(maxTables int, maxCapacity int, structType string, sstmanager *sstable.SSTable) *MemManager {
 	tables := make([]*MemTable, maxTables)
 	for i := 0; i < maxTables; i++ {
 		tables[i] = MakeMemTable(maxCapacity, structType)
@@ -34,6 +36,7 @@ func MakeMemTableManager(maxTables int, maxCapacity int, structType string) *Mem
 	return &MemManager{
 		currentTable: tables[0],
 		tables:       tables,
+		sstmanager:   sstmanager,
 		currentIndex: 0,
 		maxTables:    maxTables,
 		initialFill:  false, //initial round of tables hasn't been filled
@@ -42,10 +45,13 @@ func MakeMemTableManager(maxTables int, maxCapacity int, structType string) *Mem
 
 // FlushMem flush oldest memtable/create sstable/flush wal
 func (mm *MemManager) FlushMem() {
-	//create sst
+	err := mm.sstmanager.Flush(mm.currentTable.GetSorted())
+	if err != nil {
+		return
+	}
 	mm.currentTable.Clear()
-	fmt.Print("Flush this shit")
 	//flush acompanying wal
+	fmt.Print("Flush this shit")
 }
 
 func (mm *MemManager) SwitchTable() {
