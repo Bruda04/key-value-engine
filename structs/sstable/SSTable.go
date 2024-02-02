@@ -1,6 +1,7 @@
 package sstable
 
 import (
+	"encoding/json"
 	"fmt"
 	"key-value-engine/structs/record"
 	"os"
@@ -18,14 +19,15 @@ const (
 	GLOBALDICTNAME = "SST_Dict.json"
 	SINGLEFILENAME = "SST.db"
 	OFFSETSIZE     = 8
+	HEADERSIZE     = 5 * OFFSETSIZE
 )
 
 type SSTable struct {
 	nextIndex         int
 	summaryFactor     int
 	multipleFiles     bool
-	filterProbability float64
 	compression       bool
+	filterProbability float64
 }
 
 func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float64, compress bool) (*SSTable, error) {
@@ -54,7 +56,7 @@ func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float6
 func (sst *SSTable) Get(key string) (*record.Record, error) {
 	subdirs, err := getSubdirs(DIRECTORY)
 	if err != nil {
-		return nil, fmt.Errorf("error getting SST directories: %s\n", err)
+		return nil, err
 	}
 
 	// looping backwards
@@ -62,52 +64,13 @@ func (sst *SSTable) Get(key string) (*record.Record, error) {
 		subdir := subdirs[i]
 		subdirPath := DIRECTORY + string(os.PathSeparator) + subdir + string(os.PathSeparator)
 
-		files, _ := readTOC(DIRECTORY + string(os.PathSeparator) + subdir)
+		found, err := sst.checkBf(key, subdirPath)
+		if err != nil {
+			return nil, err
+		}
 
-		if len(files) > 1 {
-			if sst.compression {
-				found, err := sst.checkMultipleComp(key, subdirPath)
-				if err != nil {
-					return nil, fmt.Errorf("error finding key: %s\n", err)
-				}
-				// if found return, otherwise continue search in next SST
-				if found != nil {
-					return found, nil
-				}
-
-			} else {
-				found, err := sst.checkMultiple(key, subdirPath)
-				if err != nil {
-					return nil, fmt.Errorf("error finding key: %s\n", err)
-				}
-				// if found return, otherwise continue search in next SST
-				if found != nil {
-					return found, nil
-				}
-			}
-
-		} else {
-			if sst.compression {
-				found, err := sst.checkSingleComp(key, subdirPath)
-				if err != nil {
-					return nil, fmt.Errorf("error finding key: %s\n", err)
-				}
-
-				// if found return, otherwise continue search in next SST
-				if found != nil {
-					return found, nil
-				}
-			} else {
-				found, err := sst.checkSingle(key, subdirPath)
-				if err != nil {
-					return nil, fmt.Errorf("error finding key: %s\n", err)
-				}
-
-				// if found return, otherwise continue search in next SST
-				if found != nil {
-					return found, nil
-				}
-			}
+		if found != nil {
+			return found, nil
 		}
 
 	}
@@ -125,20 +88,43 @@ func (sst *SSTable) Flush(data []*record.Record) error {
 	}
 	sst.nextIndex++
 
-	if sst.multipleFiles {
-		// make Multiple files
-		if sst.compression {
-			err = sst.makeMultipleFilesComp(data, dirPath)
-		} else {
-			err = sst.makeMultipleFiles(data, dirPath)
+	err = sst.makeTOC(dirPath, sst.multipleFiles)
+	if err != nil {
+		return err
+	}
+
+	if sst.compression {
+		globalDict := make(map[string]int)
+		marshalled, err := json.MarshalIndent(globalDict, "", "  ")
+		if err != nil {
+			return err
+
 		}
-	} else {
-		// make Single file
-		if sst.compression {
-			err = sst.makeSingleFileComp(data, dirPath)
-		} else {
-			err = sst.makeSingleFile(data, dirPath)
+
+		err = os.WriteFile(dirPath+string(os.PathSeparator)+GLOBALDICTNAME, marshalled, 0644)
+		if err != nil {
+			return err
 		}
+	}
+
+	for _, rec := range data {
+		err = sst.putData(rec, dirPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = sst.formIndex(dirPath)
+	if err != nil {
+		return err
+	}
+	err = sst.formSummary(dirPath)
+	if err != nil {
+		return err
+	}
+	err = sst.formBfMt(dirPath, len(data))
+	if err != nil {
+		return err
 	}
 
 	return nil
