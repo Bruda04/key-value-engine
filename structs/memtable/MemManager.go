@@ -74,13 +74,14 @@ func (mm *MemManager) GetCurrentTable() *MemTable {
 }
 
 // FindInMem find if element exists in any of the memtables
-func (mm *MemManager) FindInMem(key string) bool {
+func (mm *MemManager) FindInMem(key string) (bool, *record.Record) {
 	for i := 0; i < mm.maxTables; i++ {
-		if mm.tables[i].Find(key) {
-			return true
+		found, el := mm.tables[i].Find(key)
+		if found {
+			return found, el
 		}
 	}
-	return false
+	return false, nil
 }
 
 func (mm *MemManager) GetMemRangeIterators(minRange, maxRange string) []iterator.Iterator {
