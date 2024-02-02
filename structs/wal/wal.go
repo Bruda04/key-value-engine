@@ -40,7 +40,7 @@ Returns:
 - *WAL: Pointer to the created WAL instance.
 - error: Error, if any, during the initialization process.
 */
-func MakeWAL(segmentSize int64) (*WAL, error) {
+func MakeWAL(segmentSize int64, offset int64) (*WAL, error) {
 	if err := os.MkdirAll(DIRECTORY, 0755); err != nil {
 		return nil, fmt.Errorf("error creating data directory: %s", err)
 	}
@@ -61,12 +61,15 @@ func MakeWAL(segmentSize int64) (*WAL, error) {
 			return nil, fmt.Errorf("error creating initial segment file: %s", err)
 		}
 	}
+	if offset == 0 {
+		offset = 8
+	}
 
 	wal := &WAL{
 		SegmentSize:     segmentSize,
 		SegmentFiles:    filenames,
 		RepairFileIndex: 0,
-		RepairOffset:    8,
+		RepairOffset:    offset,
 	}
 
 	return wal, nil
@@ -273,13 +276,13 @@ Returns:
 - *record.Record: Restored record.
 - error: Error, if any, during the restoration process.
 */
-func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
+func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 	if offset != -1 {
 		wal.RepairOffset = offset
 	}
 	f, err := os.OpenFile(wal.SegmentFiles[wal.RepairFileIndex], os.O_RDWR, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("error opening new segment file for writing: %s", err)
+		return nil, 0, fmt.Errorf("error opening new segment file for writing: %s", err)
 	}
 	defer func(f *os.File) {
 		err := f.Close()
@@ -290,7 +293,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 
 	mmappedData, err := mmap.Map(f, mmap.RDWR, 0)
 	if err != nil {
-		return nil, fmt.Errorf("error mmaping new file: %s", err)
+		return nil, 0, fmt.Errorf("error mmaping new file: %s", err)
 	}
 	defer func(mmappedData *mmap.MMap) {
 		err := mmappedData.Unmap()
@@ -306,7 +309,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 		copy(recordFirstPartBytes, mmappedData[wal.RepairOffset:])
 
 		if wal.RepairFileIndex == int64(len(wal.SegmentFiles)-1) {
-			return nil, fmt.Errorf("not enough segment files: %s", err)
+			return nil, 0, fmt.Errorf("not enough segment files: %s", err)
 		}
 
 		wal.RepairFileIndex++
@@ -314,7 +317,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 
 		secondFile, err := os.OpenFile(wal.SegmentFiles[wal.RepairFileIndex], os.O_RDWR, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("error opening new segment file for writing: %s", err)
+			return nil, 0, fmt.Errorf("error opening new segment file for writing: %s", err)
 		}
 		defer func(secondFile *os.File) {
 			err := secondFile.Close()
@@ -325,7 +328,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 
 		mmapedDataSecondFile, err := mmap.Map(secondFile, mmap.RDWR, 0)
 		if err != nil {
-			return nil, fmt.Errorf("error mmaping new file: %s", err)
+			return nil, 0, fmt.Errorf("error mmaping new file: %s", err)
 		}
 		defer func(mmapedDataSecondFile *mmap.MMap) {
 			err := mmapedDataSecondFile.Unmap()
@@ -349,10 +352,10 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 		rec := record.BytesToRecord(recBytes)
 
 		if record.CrcHash(rec.GetValue()) != rec.GetCrc() {
-			return nil, fmt.Errorf("crc does not match the hashed value: %s", err)
+			return nil, 0, fmt.Errorf("crc does not match the hashed value: %s", err)
 		}
 
-		return rec, nil
+		return rec, wal.RepairOffset, nil
 
 	}
 
@@ -366,7 +369,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 		copy(recordFirstPartBytes, mmappedData[wal.RepairOffset:])
 
 		if wal.RepairFileIndex == int64(len(wal.SegmentFiles)-1) {
-			return nil, fmt.Errorf("not enough segment files: %s", err)
+			return nil, 0, fmt.Errorf("not enough segment files: %s", err)
 		}
 
 		wal.RepairFileIndex++
@@ -374,7 +377,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 
 		secondFile, err := os.OpenFile(wal.SegmentFiles[wal.RepairFileIndex], os.O_RDWR, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("error opening new segment file for writing: %s", err)
+			return nil, 0, fmt.Errorf("error opening new segment file for writing: %s", err)
 		}
 		defer func(secondFile *os.File) {
 			err := secondFile.Close()
@@ -385,7 +388,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 
 		mmapedDataSecondFile, err := mmap.Map(secondFile, mmap.RDWR, 0)
 		if err != nil {
-			return nil, fmt.Errorf("error mmaping new file: %s", err)
+			return nil, 0, fmt.Errorf("error mmaping new file: %s", err)
 		}
 		defer func(mmapedDataSecondFile *mmap.MMap) {
 			err := mmapedDataSecondFile.Unmap()
@@ -409,10 +412,10 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 		rec := record.BytesToRecord(recBytes)
 
 		if record.CrcHash(rec.GetValue()) != rec.GetCrc() {
-			return nil, fmt.Errorf("crc does not match the hashed value: %s", err)
+			return nil, 0, fmt.Errorf("crc does not match the hashed value: %s", err)
 		}
 
-		return rec, nil
+		return rec, wal.RepairOffset, nil
 	}
 
 	recBytes := make([]byte, recSize)
@@ -423,19 +426,19 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, error) {
 	rec := record.BytesToRecord(recBytes)
 
 	if record.CrcHash(rec.GetValue()) != rec.GetCrc() {
-		return nil, fmt.Errorf("error opening new segment file for writing: %s", err)
+		return nil, 0, fmt.Errorf("error opening new segment file for writing: %s", err)
 	}
 
-	return rec, nil
+	return rec, wal.RepairOffset, nil
 }
 
 /*
-deleteLWM deletes WAL segment files up to the specified Low Watermark (LWM).
+DeleteLWM deletes WAL segment files up to the specified Low Watermark (LWM).
 
 Parameters:
 - lwm: Low Watermark specifying the index up to which segments should be deleted.
 */
-func (wal *WAL) deleteLWM(lwm uint64) {
+func (wal *WAL) DeleteLWM(lwm uint64) {
 	toDelte := make([]string, lwm)
 	copy(toDelte, wal.SegmentFiles[:lwm])
 
