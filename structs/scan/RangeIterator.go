@@ -4,6 +4,7 @@ import (
 	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/memtable"
 	"key-value-engine/structs/record"
+	"key-value-engine/structs/sstable"
 )
 
 /*
@@ -25,9 +26,11 @@ FOR SSTABLE JUST ADD ITS ITERATORS TO THE ITERATORS, and pass sst manager
 	memmanager - in order to extract memtable iterators
 	sstable /manager - in order to extract sstable iterators
 */
-func MakeRangeIterate(minRange, maxRange string, manager *memtable.MemManager) *RangeIterator {
+func MakeRangeIterate(minRange, maxRange string, manager *memtable.MemManager, sst *sstable.SSTable) *RangeIterator {
+	iterators := sst.GetSSTRangeIterators(minRange, maxRange)
+	iterators = append(iterators, manager.GetMemRangeIterators(minRange, maxRange)...)
 	return &RangeIterator{
-		manager.GetMemRangeIterators(minRange, maxRange),
+		iterators,
 	}
 }
 

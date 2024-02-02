@@ -4,6 +4,7 @@ import (
 	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/memtable"
 	"key-value-engine/structs/record"
+	"key-value-engine/structs/sstable"
 )
 
 type PrefixIterator struct {
@@ -18,9 +19,12 @@ FOR SSTABLE JUST ADD ITS ITERATORS TO THE ITERATORS, and pass sst manager
 	memmanager - in order to extract memtable iterators
 	sstable /manager - in order to extract sstable iterators
 */
-func MakePrefixIterate(prefix string, manager *memtable.MemManager) *PrefixIterator {
+func MakePrefixIterate(prefix string, manager *memtable.MemManager, sst *sstable.SSTable) *PrefixIterator {
+	iterators := sst.GetSSTPrefixIterators(prefix)
+	iterators = append(iterators, manager.GetMemPrefixIterators(prefix)...)
+
 	return &PrefixIterator{
-		manager.GetMemPrefixIterators(prefix),
+		iterators,
 	}
 }
 
