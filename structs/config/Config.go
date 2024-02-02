@@ -17,6 +17,7 @@ const (
 	DEFAULT_SKIPLISTMAXHEIGHT   = 20
 	DEFAULT_BTREEDEGREE         = 4
 	DEFAULT_CACHESIZE           = 5
+	DEFAULT_FILESSST            = true
 	DEFAULT_SUMMARYINDEXDENSITY = 5
 	DEFAULT_DO_COMPRESSION      = false
 	DEFAULT_MAXLSMLEVELS        = 10
@@ -24,23 +25,26 @@ const (
 	DEFAULT_COMPRESSIONTYPE     = "size-tiered"
 	DEFAULT_TOKENCAPACITY       = 10
 	DEFAULT_REFILLCOOLDOWN      = 60
+	DEFAULT_FILTERPRECISION     = 0.1
 )
 
 type Config struct {
-	WalSize             uint64 `json:"wal_size"`
-	MemtableSize        uint64 `json:"memtable_size"`
-	MemtableCount       uint64 `json:"memtable_count"`
-	MemtableStructure   string `json:"memtable_structure"`
-	BTreeDegree         uint64 `json:"btree_degree"`
-	SkipListMaxHeight   uint64 `json:"skip_list_max_height"`
-	CacheSize           uint64 `json:"cahce_size"`
-	SummaryIndexDensity uint64 `json:"summary_index_density"`
-	Compress            bool   `json:"do_compression"`
-	CompressionType     string `json:"compression_tyoe"`
-	MaxLsmLevels        uint64 `json:"max_lsm_levels"`
-	TablesToCompress    uint64 `json:"tables_to_compress"`
-	TokenCapacity       uint64 `json:"token-capacity"`
-	RefillCooldown      uint64 `json:"refill-cooldown"`
+	WalSize             uint64  `json:"wal_size"`
+	MemtableSize        uint64  `json:"memtable_size"`
+	MemtableCount       uint64  `json:"memtable_count"`
+	MemtableStructure   string  `json:"memtable_structure"`
+	BTreeDegree         uint64  `json:"btree_degree"`
+	SkipListMaxHeight   uint64  `json:"skip_list_max_height"`
+	CacheSize           uint64  `json:"cahce_size"`
+	MultipleFilesSST    bool    `json:"separate_sst_files"`
+	SummaryIndexDensity uint64  `json:"summary_index_density"`
+	Compress            bool    `json:"do_compression"`
+	CompressionType     string  `json:"compression_tyoe"`
+	MaxLsmLevels        uint64  `json:"max_lsm_levels"`
+	TablesToCompress    uint64  `json:"tables_to_compress"`
+	TokenCapacity       uint64  `json:"token_capacity"`
+	RefillCooldown      uint64  `json:"refill_cooldown"`
+	FilterPrecsion      float64 `json:"filter_precsion"`
 }
 
 func MakeConfig() (*Config, error) {
@@ -54,6 +58,7 @@ func MakeConfig() (*Config, error) {
 		BTreeDegree:         DEFAULT_BTREEDEGREE,
 		SkipListMaxHeight:   DEFAULT_SKIPLISTMAXHEIGHT,
 		CacheSize:           DEFAULT_CACHESIZE,
+		MultipleFilesSST:    DEFAULT_FILESSST,
 		SummaryIndexDensity: DEFAULT_SUMMARYINDEXDENSITY,
 		Compress:            DEFAULT_DO_COMPRESSION,
 		CompressionType:     DEFAULT_COMPRESSIONTYPE,
@@ -61,6 +66,7 @@ func MakeConfig() (*Config, error) {
 		TablesToCompress:    DEFAULT_TABLESTOCOMPRESS,
 		TokenCapacity:       DEFAULT_TOKENCAPACITY,
 		RefillCooldown:      DEFAULT_REFILLCOOLDOWN,
+		FilterPrecsion:      DEFAULT_FILTERPRECISION,
 	}
 
 	if _, err := os.Stat(CONFIG_DIR); os.IsNotExist(err) {
@@ -148,6 +154,10 @@ func (cfg *Config) validate() {
 
 	if cfg.RefillCooldown < 1 || cfg.RefillCooldown > 600 {
 		cfg.RefillCooldown = DEFAULT_REFILLCOOLDOWN
+	}
+
+	if cfg.FilterPrecsion < 0.01 || cfg.FilterPrecsion > 0.5 {
+		cfg.FilterPrecsion = DEFAULT_FILTERPRECISION
 	}
 }
 
