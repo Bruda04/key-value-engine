@@ -3,6 +3,7 @@ package sstable
 import (
 	"encoding/json"
 	"fmt"
+	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/record"
 	"os"
 )
@@ -83,7 +84,6 @@ func (sst *SSTable) Get(key string) (*record.Record, error) {
 	}
 
 	return nil, nil
-
 }
 
 func (sst *SSTable) Flush(data []*record.Record) error {
@@ -136,4 +136,46 @@ func (sst *SSTable) Flush(data []*record.Record) error {
 
 	sst.Compress()
 	return nil
+}
+
+// --------------------------FOR ITERATORS
+func (sst *SSTable) GetSSTRangeIterators(minRange, maxRange string) []iterator.Iterator {
+	var sstIterators []iterator.Iterator
+
+	for _, path := range sst.getIteratorDirs() {
+		sstIterators = append(sstIterators, sst.NewSSTRangeIterator(minRange, maxRange, path))
+	}
+
+	return sstIterators
+}
+
+func (sst *SSTable) GetSSTPrefixIterators(prefix string) []iterator.Iterator {
+	var sstIterators []iterator.Iterator
+
+	for _, path := range sst.getIteratorDirs() {
+		sstIterators = append(sstIterators, sst.NewSSTPrefixIterator(prefix, path))
+	}
+
+	return sstIterators
+}
+
+func (sst *SSTable) getIteratorDirs() []string {
+	var singleSSTPath []string
+
+	tiers, err := sst.getDirsByTier()
+	if err != nil {
+		return nil
+	}
+
+	// looping backwards
+	for i := 0; i < len(tiers); i++ {
+		for j := len(tiers[i]) - 1; j >= 0; j-- {
+			subdir := tiers[i][j]
+			subdirPath := subdir + string(os.PathSeparator)
+
+			singleSSTPath = append(singleSSTPath, subdirPath)
+		}
+	}
+
+	return singleSSTPath
 }
