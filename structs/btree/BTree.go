@@ -42,7 +42,7 @@ Parameters:
 Returns:
   - bool: True if the key is found; otherwise, false.
 */
-func (bt *BTree) Find(recKey string) bool {
+func (bt *BTree) Find(recKey string) (bool, *record.Record) {
 	tmpNode := bt.root
 
 	for {
@@ -52,9 +52,9 @@ func (bt *BTree) Find(recKey string) bool {
 		}
 
 		if i < len(tmpNode.keys) && recKey == tmpNode.keys[i].GetKey() {
-			return !tmpNode.keys[i].IsTombstone()
+			return !tmpNode.keys[i].IsTombstone(), tmpNode.keys[i]
 		} else if tmpNode.leaf {
-			return false
+			return false, nil
 		} else {
 			tmpNode = tmpNode.children[i]
 		}

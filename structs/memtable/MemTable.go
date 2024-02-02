@@ -77,14 +77,14 @@ func (mem *MemTable) Clear() {
 	mem.capacity = 0
 }
 
-func (mem *MemTable) Find(key string) bool {
+func (mem *MemTable) Find(key string) (bool, *record.Record) {
 	if mem.structType == "btree" {
 		return mem.bTree.Find(key)
 	} else if mem.structType == "skiplist" {
 		return mem.skipList.Find(key)
 	} else {
-		_, found := mem.hashMap[key]
-		return found
+		element, found := mem.hashMap[key]
+		return found, element
 	}
 }
 
