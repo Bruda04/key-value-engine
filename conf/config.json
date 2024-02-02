@@ -6,11 +6,13 @@
   "btree_degree": 4,
   "skip_list_max_height": 20,
   "cahce_size": 5,
+  "separate_sst_files": true,
   "summary_index_density": 5,
   "do_compression": false,
   "compression_tyoe": "size-tiered",
   "max_lsm_levels": 10,
   "tables_to_compress": 5,
-  "token-capacity": 10,
-  "refill-cooldown": 60
+  "token_capacity": 10,
+  "refill_cooldown": 60,
+  "filter_precsion": 0.1
 }
