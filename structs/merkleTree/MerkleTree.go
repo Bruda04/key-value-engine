@@ -11,7 +11,8 @@ const (
 )
 
 type MerkleTree struct {
-	root *Node
+	leafNodes []*Node
+	root      *Node
 }
 
 type Node struct {
@@ -21,31 +22,32 @@ type Node struct {
 }
 
 /*
-MakeMerkleTree creates a Merkle tree from the provided dataBlock.
-
-Parameters:
-- dataBlock: A 2D byte slice representing the data to be included in the Merkle tree
-In our project, that 2D byte slice will be SSTable's data file records
+MakeMerkleTree creates a Merkle tree from the provided tree leaves.
 
 Return:
 - A pointer to the MerkleTree structure representing the root of the Merkle tree.
 */
-func MakeMerkleTree(dataBlock [][]byte) *MerkleTree {
-	var treeNodes []*Node
-	for _, value := range dataBlock {
-		treeNodes = append(treeNodes, NewLeafNode(value))
-	}
 
-	if (len(treeNodes) & (len(treeNodes) - 1)) != 0 {
-		for (len(treeNodes) & (len(treeNodes) - 1)) != 0 {
-			treeNodes = append(treeNodes, EmptyLeafNode())
+func MakeMerkleTree() *MerkleTree {
+	return &MerkleTree{
+		leafNodes: make([]*Node, 0),
+		root:      nil,
+	}
+}
+
+func (mt *MerkleTree) FormMerkleTree() {
+	if (len(mt.leafNodes) & (len(mt.leafNodes) - 1)) != 0 {
+		for (len(mt.leafNodes) & (len(mt.leafNodes) - 1)) != 0 {
+			mt.leafNodes = append(mt.leafNodes, emptyLeafNode())
 		}
 	}
+
+	treeNodes := mt.leafNodes
 
 	for len(treeNodes) > 1 {
 		var newTreeNodes []*Node
 		for i := 0; i < len(treeNodes); i += 2 {
-			parentNode := AddNode(treeNodes[i], treeNodes[i+1])
+			parentNode := addNode(treeNodes[i], treeNodes[i+1])
 			newTreeNodes = append(newTreeNodes, parentNode)
 
 		}
@@ -53,30 +55,21 @@ func MakeMerkleTree(dataBlock [][]byte) *MerkleTree {
 	}
 	rootNode := treeNodes[0]
 
-	return &MerkleTree{
-		root: rootNode,
-	}
+	mt.root = rootNode
 }
 
 /*
-NewLeafNode hashes the provided data and creates a leaf node with the hashed data.
+Add hashes the provided data and creates a leaf node with the hashed data.
 
 Parameters:
 - data: A byte slice representing the data to be hashed and stored in the leaf node.
-
-Return:
-- A pointer to the Node structure representing the new leaf node.
 */
-func NewLeafNode(data []byte) *Node {
-	hashedData := Hash(data)
-	return &Node{
-		data:  hashedData,
-		left:  nil,
-		right: nil,
-	}
+func (mt *MerkleTree) Add(data []byte) {
+	hashedData := hash(data)
+	mt.leafNodes = append(mt.leafNodes, &Node{data: hashedData, left: nil, right: nil})
 }
 
-func EmptyLeafNode() *Node {
+func emptyLeafNode() *Node {
 	return &Node{
 		data:  make([]byte, HASHVALUESIZE),
 		left:  nil,
@@ -85,7 +78,7 @@ func EmptyLeafNode() *Node {
 }
 
 /*
-AddNode combines the data of the child nodes, hashes it, and creates a parent node.
+addNode combines the data of the child nodes, hashes it, and creates a parent node.
 
 Parameters:
 - leftChild: A pointer to the left child node.
@@ -94,13 +87,13 @@ Parameters:
 Return:
 - A pointer to the Node structure representing the new parent node.
 */
-func AddNode(leftChild *Node, rightChild *Node) *Node {
+func addNode(leftChild *Node, rightChild *Node) *Node {
 	var childrenData, hashedParentData []byte
 	if rightChild == nil {
-		hashedParentData = Hash(leftChild.data)
+		hashedParentData = hash(leftChild.data)
 	} else {
 		childrenData = append(leftChild.data, rightChild.data...)
-		hashedParentData = Hash(childrenData)
+		hashedParentData = hash(childrenData)
 	}
 	return &Node{
 		data:  hashedParentData,
@@ -118,10 +111,10 @@ Parameters:
 Return:
 - A 2D byte slice containing paths to the incorrect elements.
 */
-func (tree *MerkleTree) IncorrectElements(dataSet [][]byte) [][]byte {
+func (mt *MerkleTree) IncorrectElements(dataSet [][]byte) [][]byte {
 	var incorrectEl [][]byte
 	for _, data := range dataSet {
-		validity, _ := tree.CheckValidityOfNode(data)
+		validity, _ := mt.CheckValidityOfNode(data)
 		if !validity {
 			incorrectEl = append(incorrectEl, data)
 		}
@@ -139,9 +132,9 @@ Return:
 - A boolean indicating the validity of the node.
 - A 2D byte slice containing the path to the node.
 */
-func (tree *MerkleTree) CheckValidityOfNode(data []byte) (bool, [][]byte) {
-	hashedData := Hash(data)
-	valid, path := tree.generatePath(tree.root, hashedData, [][]byte{tree.root.data})
+func (mt *MerkleTree) CheckValidityOfNode(data []byte) (bool, [][]byte) {
+	hashedData := hash(data)
+	valid, path := mt.generatePath(mt.root, hashedData, [][]byte{mt.root.data})
 	return valid, path
 }
 
@@ -157,7 +150,7 @@ Return:
 - A boolean indicating the validity of the target node.
 - A 2D byte slice containing the path to the target node.
 */
-func (tree *MerkleTree) generatePath(node *Node, data []byte, path [][]byte) (bool, [][]byte) {
+func (mt *MerkleTree) generatePath(node *Node, data []byte, path [][]byte) (bool, [][]byte) {
 	if node == nil {
 		return false, path
 	}
@@ -169,12 +162,12 @@ func (tree *MerkleTree) generatePath(node *Node, data []byte, path [][]byte) (bo
 		return false, path
 	}
 
-	leftValid, leftPath := tree.generatePath(node.left, data, append(path, node.right.data))
+	leftValid, leftPath := mt.generatePath(node.left, data, append(path, node.right.data))
 	if leftValid {
 		return true, leftPath
 	}
 	if node.right != nil {
-		rightValid, rightPath := tree.generatePath(node.right, data, append(path, node.left.data))
+		rightValid, rightPath := mt.generatePath(node.right, data, append(path, node.left.data))
 		if rightValid {
 			return true, rightPath
 		}
@@ -183,7 +176,7 @@ func (tree *MerkleTree) generatePath(node *Node, data []byte, path [][]byte) (bo
 }
 
 /*
-Hash computes the SHA1 hash of the provided data.
+hash computes the SHA1 hash of the provided data.
 
 Parameters:
 - data: A byte slice representing the data to be hashed.
@@ -191,7 +184,7 @@ Parameters:
 Return:
 - A byte slice representing the SHA1 hash of the input data.
 */
-func Hash(data []byte) []byte {
+func hash(data []byte) []byte {
 	hash := sha1.Sum(data)
 	return hash[:]
 }
@@ -219,7 +212,7 @@ func bytesEqual(a, b []byte) bool {
 }
 
 /*
-SerializeMerkleTree serializes a MerkleTree to a binary-formatted byte slice.
+MerkleTreeToBytes serializes a MerkleTree to a binary-formatted byte slice.
 
 Parameters:
 - tree: A pointer to the MerkleTree structure to be serialized.
@@ -228,7 +221,7 @@ Return:
 - A byte slice representing the serialized MerkleTree.
 - An error if serialization fails.
 */
-func SerializeMerkleTree(tree *MerkleTree) ([]byte, error) {
+func MerkleTreeToBytes(tree *MerkleTree) ([]byte, error) {
 	// Serialize the tree data into a byte slice
 	rootData, err := serializeNode(tree.root)
 	if err != nil {
@@ -281,7 +274,7 @@ func serializeNode(node *Node) ([]byte, error) {
 }
 
 /*
-DeserializeMerkleTree deserializes a MerkleTree from a binary-formatted byte slice.
+BytesToMerkleTree deserializes a MerkleTree from a binary-formatted byte slice.
 
 Parameters:
 - data: A byte slice representing the serialized MerkleTree.
@@ -290,7 +283,7 @@ Return:
 - A pointer to the MerkleTree structure representing the deserialized MerkleTree.
 - An error if deserialization fails.
 */
-func DeserializeMerkleTree(data []byte) (*MerkleTree, error) {
+func BytesToMerkleTree(data []byte) (*MerkleTree, error) {
 	treeHeight := int(math.Ceil(math.Log2(float64(len(data) / HASHVALUESIZE))))
 
 	// Check if there is enough data for the root
