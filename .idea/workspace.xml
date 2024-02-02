@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5378a990-7fbb-4b43-a5cc-6df3f0b9b49d" name="Changes" comment="" />
+    <list default="true" id="5378a990-7fbb-4b43-a5cc-6df3f0b9b49d" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/conf/config.json" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -49,7 +52,7 @@
     "WebServerToolWindowFactoryState": "false",
     "git-widget-placeholder": "develop",
     "go.import.settings.migrated": "true",
-    "last_opened_file_path": "C:/Users/bradi/Documents/Fakultet/3.SEMESTAR/Napredni algoritmi i strukture podataka/Engine",
+    "last_opened_file_path": "C:/Users/bradi/Documents/Fakultet/3.SEMESTAR/Napredni algoritmi i strukture podataka/Projekat/key-value-engine",
     "node.js.detected.package.eslint": "true",
     "node.js.selected.package.eslint": "(autodetect)"
   }
