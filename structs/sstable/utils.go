@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"key-value-engine/structs/record"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -83,4 +85,52 @@ func (sst *SSTable) indexFormatToBytes(rec *record.Record, offset int) []byte {
 	result = append(result, offsetBytes...)
 
 	return result
+}
+
+func (sst *SSTable) getDirsByTier() ([][]string, error) {
+	subdirs, err := getSubdirs(DIRECTORY)
+	if err != nil {
+		return nil, fmt.Errorf("error getting SST directories: %s\n", err)
+	}
+
+	// Map to store directories grouped by their tier number
+	dirnamesByTierMap := make(map[int][]string)
+
+	for i := 0; i < len(subdirs); i++ {
+		subdir := subdirs[i] // C1_SST1 for example
+		var strIndex []byte
+
+		for j := 1; j < len(subdir) && subdir[j] != '_'; j++ {
+			strIndex = append(strIndex, subdir[j])
+		}
+
+		resultString := string(strIndex)
+
+		// Convert the string to an integer
+		tierNumber, err := strconv.Atoi(resultString)
+		if err != nil {
+			// Handle the error, for example, print a message and continue to the next iteration
+			fmt.Printf("Error converting %s to an integer: %v\n", resultString, err)
+			continue
+		}
+
+		// Check if the tier number is greater than zero
+		if tierNumber > 0 {
+			// Append the current subdir to the appropriate tier in the map
+			dirnamesByTierMap[tierNumber] = append(dirnamesByTierMap[tierNumber], DIRECTORY+string(os.PathSeparator)+subdir+string(os.PathSeparator))
+		}
+	}
+
+	// Convert the map to a sorted slice of slices
+	var dirnamesByTier [][]string
+	var sortedTiers []int
+	for tier := range dirnamesByTierMap {
+		sortedTiers = append(sortedTiers, tier)
+	}
+	sort.Ints(sortedTiers)
+
+	for _, tier := range sortedTiers {
+		dirnamesByTier = append(dirnamesByTier, dirnamesByTierMap[tier])
+	}
+	return dirnamesByTier, nil
 }
