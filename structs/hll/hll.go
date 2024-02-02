@@ -154,16 +154,20 @@ Parameters:
 Returns:
 - error: An error indicating any issues encountered during deserialization.
 */
-func (hll *HyperLogLog) BytesToHLL(data []byte) error {
+func BytesToHLL(data []byte) (*HyperLogLog, error) {
 	// Check if there is enough data to deserialize
 	if len(data) < HLL_HEADER_SIZE {
-		return errors.New("insufficient data for HyperLogLog structure")
+		return nil, errors.New("insufficient data for HyperLogLog structure")
 	}
 
 	// Deserialize M, P, and Reg from the byte slice
-	hll.M = binary.LittleEndian.Uint64(data[:HLL_M_SIZE])
-	hll.P = data[HLL_M_SIZE]
-	hll.Reg = data[HLL_HEADER_SIZE:]
+	m := binary.LittleEndian.Uint64(data[:HLL_M_SIZE])
+	p := data[HLL_M_SIZE]
+	reg := data[HLL_HEADER_SIZE:]
 
-	return nil
+	return &HyperLogLog{
+		M:   m,
+		P:   p,
+		Reg: reg,
+	}, nil
 }
