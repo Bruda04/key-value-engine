@@ -16,7 +16,7 @@ type SSTableIterator struct {
 	sst      *SSTable
 
 	current *record.Record
-	offset  uint64
+	offset  int64
 
 	finish        bool
 	rangeIterator bool
@@ -61,7 +61,8 @@ func (sst *SSTable) NewSSTPrefixIterator(prefix, dirPath string) iterator.Iterat
 
 func (it *SSTableIterator) Valid() bool {
 	//I need to be able to see if the next is null without moving the offset.
-	if it.finish {
+	return it.current != nil
+	/*if it.finish {
 		return false //if I already did this before
 	}
 	oldOffset := it.offset
@@ -71,7 +72,7 @@ func (it *SSTableIterator) Valid() bool {
 	//If I moved the offset I wouldn't be able to access current (get)
 	it.offset = oldOffset
 	it.current = oldCurrent
-	return !it.finish
+	return !it.finish*/
 }
 
 // Get returns the record at the current iterator position.
@@ -214,7 +215,9 @@ func (it *SSTableIterator) Next() {
 		eof = int64(header[2])
 	}
 
-	file.Seek(int64(it.offset), 0)
+	if it.offset != 0 {
+		file.Seek(it.offset, 0)
+	}
 
 	// looping through all entries in one range of index
 	for {
@@ -243,12 +246,14 @@ func (it *SSTableIterator) Next() {
 			// stop condition
 			if string(readKey) > it.maxRange {
 				it.finish = true
+				it.current = nil
 				return
 			} else if string(readKey) < it.minRange { //if we haven't reached first good element
 				continue
 			} else { // minRange < string(readKey) < maxRange
 				// continue search in Data
-				it.offset = offsetData
+				pos, _ := file.Seek(0, 1)
+				it.offset = pos
 				rec, _ := it.sst.checkData(offsetData, it.dirPath)
 				it.current = rec
 				return
@@ -256,7 +261,8 @@ func (it *SSTableIterator) Next() {
 		} else {
 			if strings.HasPrefix(string(readKey), it.prefix) {
 				// continue search in Data
-				it.offset = offsetData
+				pos, _ := file.Seek(0, 1)
+				it.offset = pos
 				rec, _ := it.sst.checkData(offsetData, it.dirPath)
 				it.current = rec
 				return
@@ -264,6 +270,7 @@ func (it *SSTableIterator) Next() {
 				continue //keep searching for the first element
 			} else {
 				it.finish = true
+				it.current = nil
 				return //if not first, and no longer has pre-fix it has no excuse break
 			}
 		}
@@ -271,5 +278,6 @@ func (it *SSTableIterator) Next() {
 	}
 
 	it.finish = true
+	it.current = nil
 	return
 }
