@@ -4,6 +4,7 @@ import (
 	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/memtable"
 	"key-value-engine/structs/record"
+	"key-value-engine/structs/sstable"
 )
 
 type PrefixIterator struct {
@@ -18,9 +19,12 @@ FOR SSTABLE JUST ADD ITS ITERATORS TO THE ITERATORS, and pass sst manager
 	memmanager - in order to extract memtable iterators
 	sstable /manager - in order to extract sstable iterators
 */
-func MakePrefixIterate(prefix string, manager *memtable.MemManager) *PrefixIterator {
+func MakePrefixIterate(prefix string, manager *memtable.MemManager, sst *sstable.SSTable) *PrefixIterator {
+	iterators := sst.GetSSTPrefixIterators(prefix)
+	iterators = append(iterators, manager.GetMemPrefixIterators(prefix)...)
+
 	return &PrefixIterator{
-		manager.GetMemPrefixIterators(prefix),
+		iterators,
 	}
 }
 
@@ -35,8 +39,11 @@ func (pit *PrefixIterator) Next() *record.Record {
 				if ret != nil && ret.GetKey() == it.Get().GetKey() {
 					//if they're duplicates only replace it if its newer
 					if ret.GetTimestamp() > it.Get().GetTimestamp() {
+						pit.iterators[incrementId].Next() //if ret had an old version skip it, so it doesnt appear in next round
 						ret = it.Get()
 						incrementId = id
+					} else {
+						it.Next() //if ret had the good version, skip the old you found, so it doesnt appear again next round
 					}
 				} else {
 					ret = it.Get()

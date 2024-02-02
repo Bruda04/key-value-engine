@@ -4,6 +4,7 @@ import (
 	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/memtable"
 	"key-value-engine/structs/record"
+	"key-value-engine/structs/sstable"
 )
 
 /*
@@ -11,7 +12,6 @@ MAIN EXAMPLE:
 	rit := scan.MakeRangeIterateMem("a", "f", mm)
 	fmt.Println(rit.Next().GetKey())
 	fmt.Println(rit.Next().GetKey())
-
 */
 
 type RangeIterator struct {
@@ -26,9 +26,11 @@ FOR SSTABLE JUST ADD ITS ITERATORS TO THE ITERATORS, and pass sst manager
 	memmanager - in order to extract memtable iterators
 	sstable /manager - in order to extract sstable iterators
 */
-func MakeRangeIterate(minRange, maxRange string, manager *memtable.MemManager) *RangeIterator {
+func MakeRangeIterate(minRange, maxRange string, manager *memtable.MemManager, sst *sstable.SSTable) *RangeIterator {
+	iterators := sst.GetSSTRangeIterators(minRange, maxRange)
+	iterators = append(iterators, manager.GetMemRangeIterators(minRange, maxRange)...)
 	return &RangeIterator{
-		manager.GetMemRangeIterators(minRange, maxRange),
+		iterators,
 	}
 }
 
@@ -43,8 +45,11 @@ func (rit *RangeIterator) Next() *record.Record {
 				if ret != nil && ret.GetKey() == it.Get().GetKey() {
 					//if they're duplicates only replace it if its newer
 					if ret.GetTimestamp() > it.Get().GetTimestamp() {
+						rit.iterators[incrementId].Next() //if ret had an old version skip it, so it doesnt appear in next round
 						ret = it.Get()
 						incrementId = id
+					} else {
+						it.Next() //if ret had the good version, skip the old you found, so it doesnt appear again next round
 					}
 				} else {
 					ret = it.Get()
