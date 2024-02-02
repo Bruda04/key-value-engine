@@ -87,7 +87,7 @@ func (s *SkipList) Insert(val *record.Record) {
 
 }
 
-func (s *SkipList) Find(key string) bool {
+func (s *SkipList) Find(key string) (bool, *record.Record) {
 	current := s.head
 
 	for i := s.height - 1; i >= 0; i-- {
@@ -97,10 +97,10 @@ func (s *SkipList) Find(key string) bool {
 	}
 
 	if current.next[0] != nil && current.next[0].value.GetKey() == key {
-		return !current.next[0].value.IsTombstone() //current.next[0].value
+		return !current.next[0].value.IsTombstone(), current.next[0].value
 	}
 
-	return false
+	return false, nil
 }
 
 func (s *SkipList) FindNode(key string) (bool, *Node) {
