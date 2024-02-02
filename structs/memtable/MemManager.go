@@ -64,7 +64,7 @@ func (mm *MemManager) SwitchTable() {
 }
 
 // PutMem add new element to the current memtable
-func (mm *MemManager) PutMem(rec *record.Record) {
+func (mm *MemManager) PutMem(rec *record.Record) bool {
 	mm.currentTable.Put(rec)
 
 	if mm.currentTable.capacity >= mm.currentTable.maxCapacity {
@@ -72,7 +72,9 @@ func (mm *MemManager) PutMem(rec *record.Record) {
 		if mm.initialFill { //if all the tables have been filled
 			mm.FlushMem()
 		}
+		return true
 	}
+	return false
 }
 
 func (mm *MemManager) GetCurrentTable() *MemTable {
