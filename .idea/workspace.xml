@@ -4,14 +4,11 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-<<<<<<< HEAD
     <list default="true" id="5378a990-7fbb-4b43-a5cc-6df3f0b9b49d" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/key-value-engine.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/key-value-engine.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/conf/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/conf/config.json" afterDir="false" />
-=======
-    <list default="true" id="48aa9a76-ad5b-4a90-a7fa-35a7d3147057" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/structs/wal/wal.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/wal/wal.go" afterDir="false" />
->>>>>>> b0185ab02a8b69a69fa4b6f28906361f6bf113d9
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -25,19 +22,11 @@
       </list>
     </option>
   </component>
-<<<<<<< HEAD
   <component name="GOROOT" url="file://$PROJECT_DIR$/../../../../../../../../Program Files/Go" />
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
         <entry key="$PROJECT_DIR$" value="sstable" />
-=======
-  <component name="GOROOT" url="file://$PROJECT_DIR$/../../../../Program Files/Go" />
-  <component name="Git.Settings">
-    <option name="RECENT_BRANCH_BY_REPOSITORY">
-      <map>
-        <entry key="$PROJECT_DIR$" value="develop" />
->>>>>>> b0185ab02a8b69a69fa4b6f28906361f6bf113d9
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -46,21 +35,13 @@
     <option name="stateVersion" value="1" />
   </component>
   <component name="ProjectColorInfo">{
-<<<<<<< HEAD
   &quot;associatedIndex&quot;: 8
 }</component>
   <component name="ProjectId" id="2YDa3CkvwiGBv1aXwpuKvYD9G4O" />
-=======
-  &quot;customColor&quot;: &quot;&quot;,
-  &quot;associatedIndex&quot;: 8
-}</component>
-  <component name="ProjectId" id="2Za2M7c40X0bfYvrmjj94nx128e" />
->>>>>>> b0185ab02a8b69a69fa4b6f28906361f6bf113d9
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-<<<<<<< HEAD
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "DefaultGoTemplateProperty": "Go File",
@@ -80,39 +61,11 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="C:\Users\bradi\Documents\Fakultet\3.SEMESTAR\Napredni algoritmi i strukture podataka\Projekat\key-value-engine\structs\sstable" />
+      <recent name="C:\Users\bradi\Documents\Fakultet\3.SEMESTAR\Napredni algoritmi i strukture podataka\Engine\structs" />
     </key>
   </component>
   <component name="RunManager">
     <configuration name="go build key-value-engine" type="GoApplicationRunConfiguration" factoryName="Go Application" nameIsGenerated="true">
-=======
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;DefaultGoTemplateProperty&quot;: &quot;Go File&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.modules.automatic.dependencies.download&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.modules.go.list.on.any.changes.was.set&quot;: &quot;true&quot;,
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;develop&quot;,
-    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
-    &quot;go.sdk.automatically.set&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/3. SEMESTAR/NAISP/key-value-engine&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;
-  }
-}</component>
-  <component name="RecentsManager">
-    <key name="MoveFile.RECENT_KEYS">
-      <recent name="C:\3. SEMESTAR\NAISP\PROJEKAT\key-value-engine\structs\wal" />
-      <recent name="C:\3. SEMESTAR\NAISP\PROJEKAT\key-value-engine\structs\merkleTree" />
-    </key>
-  </component>
-  <component name="RunManager" selected="Go Build.go build key-value-engine/structs/wal/wal">
-    <configuration name="go build key-value-engine" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
->>>>>>> b0185ab02a8b69a69fa4b6f28906361f6bf113d9
       <module name="key-value-engine" />
       <working_directory value="$PROJECT_DIR$" />
       <kind value="PACKAGE" />
@@ -121,61 +74,11 @@
       <filePath value="$PROJECT_DIR$" />
       <method v="2" />
     </configuration>
-<<<<<<< HEAD
-=======
-    <configuration name="go build key-value-engine" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
-      <module name="key-value-engine" />
-      <working_directory value="$PROJECT_DIR$" />
-      <kind value="PACKAGE" />
-      <package value="key-value-engine" />
-      <directory value="$PROJECT_DIR$" />
-      <filePath value="$PROJECT_DIR$" />
-      <method v="2" />
-    </configuration>
-    <configuration name="go build key-value-engine/structs/wal/wal" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
-      <module name="key-value-engine" />
-      <working_directory value="$PROJECT_DIR$" />
-      <kind value="PACKAGE" />
-      <package value="key-value-engine/structs/wal" />
-      <directory value="$PROJECT_DIR$" />
-      <filePath value="$PROJECT_DIR$/structs/wal/wal/wal.go" />
-      <method v="2" />
-    </configuration>
-    <configuration name="go build key-value-engine/structs/wal/wal" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true" nameIsGenerated="true">
-      <module name="key-value-engine" />
-      <working_directory value="$PROJECT_DIR$" />
-      <kind value="PACKAGE" />
-      <package value="key-value-engine/structs/wal" />
-      <directory value="$PROJECT_DIR$" />
-      <filePath value="$PROJECT_DIR$/structs/wal/wal/wal.go" />
-      <method v="2" />
-    </configuration>
-    <recent_temporary>
-      <list>
-        <item itemvalue="Go Build.go build key-value-engine/structs/wal/wal" />
-        <item itemvalue="Go Build.go build key-value-engine" />
-      </list>
-    </recent_temporary>
->>>>>>> b0185ab02a8b69a69fa4b6f28906361f6bf113d9
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
-<<<<<<< HEAD
-=======
-  <component name="Vcs.Log.Tabs.Properties">
-    <option name="TAB_STATES">
-      <map>
-        <entry key="MAIN">
-          <value>
-            <State />
-          </value>
-        </entry>
-      </map>
-    </option>
-  </component>
->>>>>>> b0185ab02a8b69a69fa4b6f28906361f6bf113d9
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
   </component>
