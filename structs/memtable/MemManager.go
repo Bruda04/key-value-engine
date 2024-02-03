@@ -51,7 +51,7 @@ func (mm *MemManager) FlushMem() {
 	}
 	mm.currentTable.Clear()
 	//flush acompanying wal
-	fmt.Print("Flush this shit")
+	fmt.Println("Flush this shit")
 }
 
 func (mm *MemManager) SwitchTable() {
@@ -64,17 +64,18 @@ func (mm *MemManager) SwitchTable() {
 }
 
 // PutMem add new element to the current memtable
-func (mm *MemManager) PutMem(rec *record.Record) bool {
+func (mm *MemManager) PutMem(rec *record.Record) (bool, bool) {
 	mm.currentTable.Put(rec)
 
 	if mm.currentTable.capacity >= mm.currentTable.maxCapacity {
 		mm.SwitchTable()
 		if mm.initialFill { //if all the tables have been filled
 			mm.FlushMem()
+			return true, true
 		}
-		return true
+		return true, false
 	}
-	return false
+	return false, false
 }
 
 func (mm *MemManager) GetCurrentTable() *MemTable {
