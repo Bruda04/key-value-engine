@@ -39,7 +39,7 @@ type Config struct {
 	MultipleFilesSST    bool    `json:"separate_sst_files"`
 	SummaryIndexDensity uint64  `json:"summary_index_density"`
 	Compress            bool    `json:"do_compression"`
-	CompressionType     string  `json:"compression_tyoe"`
+	CompressionType     string  `json:"compression_type"`
 	MaxLsmLevels        uint64  `json:"max_lsm_levels"`
 	TablesToCompress    uint64  `json:"tables_to_compress"`
 	TokenCapacity       uint64  `json:"token_capacity"`
