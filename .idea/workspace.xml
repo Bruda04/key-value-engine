@@ -4,33 +4,68 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
+<<<<<<< HEAD
     <list default="true" id="a68177f7-cb4c-4491-8d18-20c27e00e03e" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/conf/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/conf/config.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main.go" afterDir="false" />
+=======
+    <list default="true" id="5378a990-7fbb-4b43-a5cc-6df3f0b9b49d" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/key-value-engine.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/key-value-engine.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+>>>>>>> 8404192aa9b0cbf949e15f000a5d9deda29726f8
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+<<<<<<< HEAD
   <component name="GOROOT" url="file://$PROJECT_DIR$/../../../../../../../../Program Files/Go" />
   <component name="Git.Settings">
+=======
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Go File" />
+      </list>
+    </option>
+  </component>
+  <component name="GOROOT" url="file://$PROJECT_DIR$/../../../../../../../../Program Files/Go" />
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="sstable" />
+      </map>
+    </option>
+>>>>>>> 8404192aa9b0cbf949e15f000a5d9deda29726f8
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
   <component name="ProjectColorInfo">{
+<<<<<<< HEAD
   &quot;customColor&quot;: &quot;&quot;,
   &quot;associatedIndex&quot;: 8
 }</component>
   <component name="ProjectId" id="2bpKUv4bXNrdHicnEn0vX8z89pe" />
+=======
+  &quot;associatedIndex&quot;: 8
+}</component>
+  <component name="ProjectId" id="2YDa3CkvwiGBv1aXwpuKvYD9G4O" />
+>>>>>>> 8404192aa9b0cbf949e15f000a5d9deda29726f8
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+<<<<<<< HEAD
+=======
+    "DefaultGoTemplateProperty": "Go File",
+>>>>>>> 8404192aa9b0cbf949e15f000a5d9deda29726f8
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.go.formatter.settings.were.checked": "true",
@@ -40,12 +75,24 @@
     "WebServerToolWindowFactoryState": "false",
     "git-widget-placeholder": "develop",
     "go.import.settings.migrated": "true",
+<<<<<<< HEAD
     "go.sdk.automatically.set": "true",
     "last_opened_file_path": "C:/Users/masam/OneDrive/Desktop/hello",
+=======
+    "last_opened_file_path": "C:/Users/bradi/Documents/Fakultet/3.SEMESTAR/Napredni algoritmi i strukture podataka/Projekat/key-value-engine",
+>>>>>>> 8404192aa9b0cbf949e15f000a5d9deda29726f8
     "node.js.detected.package.eslint": "true",
     "node.js.selected.package.eslint": "(autodetect)"
   }
 }]]></component>
+<<<<<<< HEAD
+=======
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\bradi\Documents\Fakultet\3.SEMESTAR\Napredni algoritmi i strukture podataka\Engine\structs" />
+    </key>
+  </component>
+>>>>>>> 8404192aa9b0cbf949e15f000a5d9deda29726f8
   <component name="RunManager">
     <configuration name="go build key-value-engine" type="GoApplicationRunConfiguration" factoryName="Go Application" nameIsGenerated="true">
       <module name="key-value-engine" />
