@@ -40,7 +40,7 @@ Returns:
 - *WAL: Pointer to the created WAL instance.
 - error: Error, if any, during the initialization process.
 */
-func MakeWAL(segmentSize int64, offset int64) (*WAL, error) {
+func MakeWAL(segmentSize int64) (*WAL, error) {
 	if err := os.MkdirAll(DIRECTORY, 0755); err != nil {
 		return nil, fmt.Errorf("error creating data directory: %s", err)
 	}
@@ -61,15 +61,12 @@ func MakeWAL(segmentSize int64, offset int64) (*WAL, error) {
 			return nil, fmt.Errorf("error creating initial segment file: %s", err)
 		}
 	}
-	if offset == 0 {
-		offset = 8
-	}
 
 	wal := &WAL{
 		SegmentSize:     segmentSize,
 		SegmentFiles:    filenames,
 		RepairFileIndex: 0,
-		RepairOffset:    offset,
+		RepairOffset:    8,
 	}
 
 	return wal, nil
@@ -251,9 +248,9 @@ func (wal *WAL) makeSegment() error {
 		return fmt.Errorf("error creating new segment file: %s\n", err)
 	}
 	defer func(file *os.File) {
-		err := file.Close()
+		err = file.Close()
 		if err != nil {
-
+			return
 		}
 	}(file)
 
@@ -280,6 +277,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 	if offset != -1 {
 		wal.RepairOffset = offset
 	}
+
 	f, err := os.OpenFile(wal.SegmentFiles[wal.RepairFileIndex], os.O_RDWR, 0644)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error opening new segment file for writing: %s", err)
@@ -301,8 +299,14 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 
 		}
 	}(&mmappedData)
+	currentSeek, _ := f.Seek(0, 1)
+	eofSeek := len(mmappedData)
+	_, _ = f.Seek(currentSeek, 0)
+	if int(offset) >= eofSeek {
+		return nil, 0, nil
+	}
 
-	leftoverSpace := wal.SegmentSize - wal.RepairOffset
+	leftoverSpace := wal.SegmentSize - offset
 
 	if leftoverSpace < record.RECORD_HEADER_SIZE {
 		recordFirstPartBytes := make([]byte, leftoverSpace)
