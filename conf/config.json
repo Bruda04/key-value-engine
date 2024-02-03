@@ -9,7 +9,7 @@
   "separate_sst_files": true,
   "summary_index_density": 5,
   "do_compression": false,
-  "compression_tyoe": "size-tiered",
+  "compression_type": "size-tiered",
   "max_lsm_levels": 10,
   "tables_to_compress": 5,
   "token_capacity": 10,
