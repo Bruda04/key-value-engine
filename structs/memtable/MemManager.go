@@ -43,12 +43,14 @@ func MakeMemTableManager(maxTables int, maxCapacity int, structType string, sstm
 }
 
 // FlushMem flush oldest memtable/create sstable/flush wal
-func (mm *MemManager) FlushMem() {
+func (mm *MemManager) FlushMem() error {
 	err := mm.sstmanager.Flush(mm.currentTable.GetSorted())
 	if err != nil {
-		return
+		return err
 	}
 	mm.currentTable.Clear()
+
+	return nil
 }
 
 func (mm *MemManager) SwitchTable() {
@@ -61,18 +63,21 @@ func (mm *MemManager) SwitchTable() {
 }
 
 // PutMem add new element to the current memtable
-func (mm *MemManager) PutMem(rec *record.Record) (bool, bool) {
+func (mm *MemManager) PutMem(rec *record.Record) (bool, bool, error) {
 	mm.currentTable.Put(rec)
 
 	if mm.currentTable.capacity >= mm.currentTable.maxCapacity {
 		mm.SwitchTable()
 		if mm.initialFill { //if all the tables have been filled
-			mm.FlushMem()
-			return true, true
+			err := mm.FlushMem()
+			if err != nil {
+				return false, false, err
+			}
+			return true, true, nil
 		}
-		return true, false
+		return true, false, nil
 	}
-	return false, false
+	return false, false, nil
 }
 
 func (mm *MemManager) GetCurrentTable() *MemTable {

@@ -3,6 +3,7 @@ package sstable
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"key-value-engine/structs/record"
 	"os"
@@ -59,7 +60,7 @@ func (sst *SSTable) extractDataSizeTier(tablesPaths []string, level int) error {
 	dirPath := SUBDIR + fmt.Sprintf("C%d_SST_%d", level+1, sst.nextIndex)
 	err := os.Mkdir(dirPath, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("error making SST direcory: %s\n", err)
+		return errors.New("error making SST direcory")
 	}
 	sst.nextIndex++
 
@@ -67,13 +68,13 @@ func (sst *SSTable) extractDataSizeTier(tablesPaths []string, level int) error {
 		globalDict := make(map[string]int)
 		marshalled, err := json.MarshalIndent(globalDict, "", "  ")
 		if err != nil {
-			return err
+			return errors.New("error converting json")
 
 		}
 
 		err = os.WriteFile(dirPath+string(os.PathSeparator)+GLOBALDICTNAME, marshalled, 0644)
 		if err != nil {
-			return err
+			return errors.New("error writting json")
 		}
 	}
 
@@ -84,7 +85,7 @@ func (sst *SSTable) extractDataSizeTier(tablesPaths []string, level int) error {
 			seek, _ := file.Seek(0, 2)
 			tableFile := makeTableFile(file, true, 0, int(seek), tablePath)
 			if err != nil {
-				return fmt.Errorf("error reading data: %s\n", err)
+				return errors.New("error making table file")
 			}
 			defer file.Close()
 			dataFiles = append(dataFiles, tableFile)
@@ -93,13 +94,13 @@ func (sst *SSTable) extractDataSizeTier(tablesPaths []string, level int) error {
 			headerBytes := make([]byte, 2*OFFSETSIZE)
 			_, err = file.Read(headerBytes)
 			if err != nil {
-				return fmt.Errorf("error reading header: %s\n", err)
+				return errors.New("error reading header")
 			}
 			endOfData := binary.LittleEndian.Uint64(headerBytes[OFFSETSIZE : 2*OFFSETSIZE])
 			tableFile := makeTableFile(file, false, 5*OFFSETSIZE, int(endOfData), tablePath)
 
 			if err != nil {
-				return fmt.Errorf("error reading data: %s\n", err)
+				return errors.New("error reading data")
 			}
 			defer file.Close()
 			dataFiles = append(dataFiles, tableFile)
@@ -189,7 +190,7 @@ func (sst *SSTable) readRecordFromFile(table *TableFile) (*record.Record, error)
 	}
 	_, err := table.file.Seek(int64(table.currentOffset), 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error reading file")
 	}
 	var ret *record.Record
 	if sst.compression {
@@ -199,7 +200,7 @@ func (sst *SSTable) readRecordFromFile(table *TableFile) (*record.Record, error)
 		// Read the SSTEntry size from the file into the buffer
 		_, err = table.file.Read(bufSize[:])
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading file")
 		}
 
 		// Decode the SSTEntry size from the buffer
@@ -207,24 +208,24 @@ func (sst *SSTable) readRecordFromFile(table *TableFile) (*record.Record, error)
 
 		_, err = table.file.Seek(-int64(binary.MaxVarintLen64-bytesRead), 1)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading file")
 		}
 
 		entryBytes := make([]byte, entrySize)
 
 		_, err = table.file.Read(entryBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading file")
 		}
 
 		globalDictData, err := os.ReadFile(table.dirPath + string(os.PathSeparator) + GLOBALDICTNAME)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading file")
 		}
 		globalDict := make(map[string]int)
 		err = json.Unmarshal(globalDictData, &globalDict)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading json")
 		}
 
 		ret, err = record.SSTBytesToRecord(entryBytes, &globalDict)
@@ -237,7 +238,7 @@ func (sst *SSTable) readRecordFromFile(table *TableFile) (*record.Record, error)
 		headerBytes := make([]byte, record.RECORD_HEADER_SIZE)
 		_, err = table.file.Read(headerBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading file")
 		}
 
 		keySize := binary.LittleEndian.Uint64(headerBytes[record.KEY_SIZE_START:record.VALUE_SIZE_START])
@@ -246,7 +247,7 @@ func (sst *SSTable) readRecordFromFile(table *TableFile) (*record.Record, error)
 		secondPartBytes := make([]byte, keySize+valSize)
 		_, err = table.file.Read(secondPartBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading file")
 		}
 		recBytes := append(headerBytes, secondPartBytes...)
 		table.currentOffset += len(recBytes)

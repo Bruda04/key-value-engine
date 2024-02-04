@@ -13,6 +13,7 @@ func (e *Engine) put(call string) {
 
 	err := e.writePath(key, value, false)
 	if err != nil {
+		displayError(err)
 		return
 	}
 
@@ -24,11 +25,13 @@ func (e *Engine) delete(call string) {
 
 	rec, err := e.readPath(key)
 	if err != nil {
+		displayError(err)
 		return
 	}
 	if rec != nil {
 		err := e.writePath(rec.GetKey(), rec.GetValue(), true)
 		if err != nil {
+			displayError(err)
 			return
 		}
 	}
@@ -40,6 +43,7 @@ func (e *Engine) get(call string) {
 
 	rec, err := e.readPath(key)
 	if err != nil {
+		displayError(err)
 		return
 	}
 	if rec != nil {

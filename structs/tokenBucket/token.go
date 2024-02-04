@@ -2,7 +2,7 @@ package tokenBucket
 
 import (
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"time"
 )
 
@@ -50,7 +50,7 @@ func (tb *TokenBucket) TakeToken(tokens int64) ([]byte, error) {
 		tb.refill()
 	}
 	if tb.tokens <= 0 {
-		return nil, fmt.Errorf("reached maximum number of requests, please wait")
+		return nil, errors.New("reached maximum number of requests, please wait")
 	}
 	tb.tokens -= tokens
 	serializedData := tb.TokenRequestToBytes()

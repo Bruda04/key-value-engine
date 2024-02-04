@@ -24,19 +24,47 @@ func (e *Engine) writePath(key string, value []byte, deleted bool) error {
 func (e *Engine) readPath(key string) (*record.Record, error) {
 	fnd, rec := e.memMan.FindInMem(key)
 	if fnd {
+		crc := record.CrcHash(rec.GetValue())
+
+		if crc != rec.GetCrc() {
+			return nil, errors.New("crc error")
+		}
+
 		return rec, nil
 	}
 
 	rec, _ = e.lruCache.Get(key)
 	if rec != nil {
+		if rec.IsTombstone() {
+			return nil, nil
+		}
+
+		crc := record.CrcHash(rec.GetValue())
+
+		if crc != rec.GetCrc() {
+			return nil, errors.New("crc error")
+		}
+
 		return rec, nil
 	}
 
-	rec, _ = e.sst.Get(key)
-
+	rec, err := e.sst.Get(key)
+	if err != nil {
+		return nil, err
+	}
 	if rec != nil {
+		if rec.IsTombstone() {
+			return nil, nil
+		}
+
+		crc := record.CrcHash(rec.GetValue())
+
+		if crc != rec.GetCrc() {
+			return nil, errors.New("crc error")
+		}
+
 		return rec, nil
 	}
 
-	return nil, errors.New("Not Found")
+	return nil, nil
 }

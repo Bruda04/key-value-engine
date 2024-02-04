@@ -73,6 +73,7 @@ func (e *Engine) Main() {
 
 		tokenBytes, err := e.tokenBucket.TakeToken(1)
 		if err != nil {
+			displayError(err)
 			continue
 		}
 		e.logToken(tokenBytes)

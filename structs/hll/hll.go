@@ -41,7 +41,7 @@ Returns:
 */
 func MakeHLL(p uint8) (*HyperLogLog, error) {
 	if p < HLL_MIN_PRECISION || p > HLL_MAX_PRECISION {
-		return nil, errors.New("Illegal precision")
+		return nil, errors.New("hll illegal precision")
 	}
 
 	m := uint64(math.Pow(2, float64(p)))
@@ -136,7 +136,7 @@ Returns:
 func (hll *HyperLogLog) HLLToBytes() ([]byte, error) {
 	// Check if precision is within valid range
 	if hll.P < HLL_MIN_PRECISION || hll.P > HLL_MAX_PRECISION {
-		return nil, errors.New("illegal precision")
+		return nil, errors.New("hll illegal precision")
 	}
 
 	// Serialize M, P, and Reg into a byte slice

@@ -2,6 +2,7 @@ package wal
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"github.com/edsrzf/mmap-go"
 	"key-value-engine/structs/record"
@@ -42,7 +43,7 @@ Returns:
 */
 func MakeWAL(segmentSize int64) (*WAL, error) {
 	if err := os.MkdirAll(DIRECTORY, 0755); err != nil {
-		return nil, fmt.Errorf("error creating data directory: %s", err)
+		return nil, errors.New("error creating wal data directory")
 	}
 
 	initialSegmentFile := FILEPATH + "_1" + EXT
@@ -58,7 +59,7 @@ func MakeWAL(segmentSize int64) (*WAL, error) {
 	} else {
 		filenames = append(filenames, initialSegmentFile)
 		if err := createInitialSegmentFile(initialSegmentFile); err != nil {
-			return nil, fmt.Errorf("error creating initial segment file: %s", err)
+			return nil, errors.New("error creating initial segment file")
 		}
 	}
 
@@ -118,7 +119,7 @@ func (wal *WAL) AddRecord(rec *record.Record) error {
 
 	f, err := os.OpenFile(filePath, os.O_RDWR, 0644)
 	if err != nil {
-		return fmt.Errorf("error opening segment file for writing: %s", err)
+		return errors.New("error opening segment file for writing")
 	}
 	defer func(f *os.File) {
 		err := f.Close()
@@ -129,7 +130,7 @@ func (wal *WAL) AddRecord(rec *record.Record) error {
 
 	mmappedData, err := mmap.Map(f, mmap.RDWR, 0)
 	if err != nil {
-		return fmt.Errorf("error mmaping file: %s", err)
+		return errors.New("error mmaping file")
 	}
 	defer func(mmappedData *mmap.MMap) {
 		err := mmappedData.Unmap()
@@ -170,7 +171,7 @@ func (wal *WAL) AddRecord(rec *record.Record) error {
 
 		secondFile, err := os.OpenFile(wal.SegmentFiles[len(wal.SegmentFiles)-1], os.O_RDWR, 0644)
 		if err != nil {
-			return fmt.Errorf("error opening new segment file for writing: %s", err)
+			return errors.New("error opening new segment file for writing")
 		}
 		defer func(secondFile *os.File) {
 			err := secondFile.Close()
@@ -181,7 +182,7 @@ func (wal *WAL) AddRecord(rec *record.Record) error {
 
 		mmapedDataSecondFile, err := mmap.Map(secondFile, mmap.RDWR, 0)
 		if err != nil {
-			return fmt.Errorf("error mmaping new file: %s", err)
+			return errors.New("error mmaping new file")
 		}
 		defer func(mmapedDataSecondFile *mmap.MMap) {
 			err := mmapedDataSecondFile.Unmap()
@@ -245,7 +246,7 @@ func (wal *WAL) makeSegment() error {
 	// Create the new segment file
 	file, err := os.Create(newSegmentFile)
 	if err != nil {
-		return fmt.Errorf("error creating new segment file: %s\n", err)
+		return errors.New("error creating new segment file")
 	}
 	defer func(file *os.File) {
 		err = file.Close()
@@ -258,7 +259,7 @@ func (wal *WAL) makeSegment() error {
 	binary.LittleEndian.PutUint64(leftover, 0)
 	_, err = file.Write(leftover)
 	if err != nil {
-		return fmt.Errorf("error writing overflow record part length to file: %s", err)
+		return errors.New("error writing overflow record part length to file")
 	}
 	return nil
 }
@@ -280,7 +281,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 
 	f, err := os.OpenFile(wal.SegmentFiles[wal.RepairFileIndex], os.O_RDWR, 0644)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error opening new segment file for writing: %s", err)
+		return nil, 0, errors.New("error opening new segment file for writing")
 	}
 	defer func(f *os.File) {
 		err := f.Close()
@@ -291,7 +292,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 
 	mmappedData, err := mmap.Map(f, mmap.RDWR, 0)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error mmaping new file: %s", err)
+		return nil, 0, errors.New("error mmaping new file")
 	}
 	defer func(mmappedData *mmap.MMap) {
 		err := mmappedData.Unmap()
@@ -313,7 +314,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 		copy(recordFirstPartBytes, mmappedData[wal.RepairOffset:])
 
 		if wal.RepairFileIndex == int64(len(wal.SegmentFiles)-1) {
-			return nil, 0, fmt.Errorf("not enough segment files: %s", err)
+			return nil, 0, errors.New("not enough segment files")
 		}
 
 		wal.RepairFileIndex++
@@ -321,7 +322,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 
 		secondFile, err := os.OpenFile(wal.SegmentFiles[wal.RepairFileIndex], os.O_RDWR, 0644)
 		if err != nil {
-			return nil, 0, fmt.Errorf("error opening new segment file for writing: %s", err)
+			return nil, 0, errors.New("error opening new segment file for writing")
 		}
 		defer func(secondFile *os.File) {
 			err := secondFile.Close()
@@ -332,7 +333,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 
 		mmapedDataSecondFile, err := mmap.Map(secondFile, mmap.RDWR, 0)
 		if err != nil {
-			return nil, 0, fmt.Errorf("error mmaping new file: %s", err)
+			return nil, 0, errors.New("error mmaping new file")
 		}
 		defer func(mmapedDataSecondFile *mmap.MMap) {
 			err := mmapedDataSecondFile.Unmap()
@@ -356,7 +357,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 		rec := record.BytesToRecord(recBytes)
 
 		if record.CrcHash(rec.GetValue()) != rec.GetCrc() {
-			return nil, 0, fmt.Errorf("crc does not match the hashed value: %s", err)
+			return nil, 0, errors.New("crc does not match the hashed value")
 		}
 
 		return rec, wal.RepairOffset, nil
@@ -373,7 +374,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 		copy(recordFirstPartBytes, mmappedData[wal.RepairOffset:])
 
 		if wal.RepairFileIndex == int64(len(wal.SegmentFiles)-1) {
-			return nil, 0, fmt.Errorf("not enough segment files: %s", err)
+			return nil, 0, errors.New("not enough segment files")
 		}
 
 		wal.RepairFileIndex++
@@ -381,7 +382,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 
 		secondFile, err := os.OpenFile(wal.SegmentFiles[wal.RepairFileIndex], os.O_RDWR, 0644)
 		if err != nil {
-			return nil, 0, fmt.Errorf("error opening new segment file for writing: %s", err)
+			return nil, 0, errors.New("error opening new segment file for writing")
 		}
 		defer func(secondFile *os.File) {
 			err := secondFile.Close()
@@ -392,7 +393,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 
 		mmapedDataSecondFile, err := mmap.Map(secondFile, mmap.RDWR, 0)
 		if err != nil {
-			return nil, 0, fmt.Errorf("error mmaping new file: %s", err)
+			return nil, 0, errors.New("error mmaping new file")
 		}
 		defer func(mmapedDataSecondFile *mmap.MMap) {
 			err := mmapedDataSecondFile.Unmap()
@@ -416,7 +417,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 		rec := record.BytesToRecord(recBytes)
 
 		if record.CrcHash(rec.GetValue()) != rec.GetCrc() {
-			return nil, 0, fmt.Errorf("crc does not match the hashed value: %s", err)
+			return nil, 0, errors.New("crc does not match the hashed value")
 		}
 
 		return rec, wal.RepairOffset, nil
@@ -430,7 +431,7 @@ func (wal *WAL) RestoreRecord(offset int64) (*record.Record, int64, error) {
 	rec := record.BytesToRecord(recBytes)
 
 	if record.CrcHash(rec.GetValue()) != rec.GetCrc() {
-		return nil, 0, fmt.Errorf("error opening new segment file for writing: %s", err)
+		return nil, 0, errors.New("error opening new segment file for writing")
 	}
 
 	return rec, wal.RepairOffset, nil
@@ -442,7 +443,7 @@ DeleteLWM deletes WAL segment files up to the specified Low Watermark (LWM).
 Parameters:
 - lwm: Low Watermark specifying the index up to which segments should be deleted.
 */
-func (wal *WAL) DeleteLWM(lwm uint64) {
+func (wal *WAL) DeleteLWM(lwm uint64) error {
 	toDelte := make([]string, lwm)
 	copy(toDelte, wal.SegmentFiles[:lwm])
 
@@ -452,19 +453,23 @@ func (wal *WAL) DeleteLWM(lwm uint64) {
 		err := os.Remove(toDelte[i])
 
 		if err != nil {
-			fmt.Println("Error deleting file:", err)
-			return
+			return errors.New("error deleting file")
 		}
 	}
 
-	wal.renameSegments()
+	err := wal.renameSegments()
+	if err != nil {
+		return err
+	}
+
+	return nil
 
 }
 
 /*
 renameSegments renames WAL segment files to maintain sequential order.
 */
-func (wal *WAL) renameSegments() {
+func (wal *WAL) renameSegments() error {
 
 	for i := 0; i < len(wal.SegmentFiles); i++ {
 		oldName := wal.SegmentFiles[i]
@@ -474,10 +479,10 @@ func (wal *WAL) renameSegments() {
 		wal.SegmentFiles[i] = newName
 
 		if err != nil {
-			fmt.Println("Error renaming file:", err)
-			return
+			return errors.New("error renaming file")
 		}
 
 	}
+	return nil
 
 }

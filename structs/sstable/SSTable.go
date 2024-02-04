@@ -2,6 +2,7 @@ package sstable
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/record"
@@ -103,13 +104,13 @@ func (sst *SSTable) Flush(data []*record.Record) error {
 		globalDict := make(map[string]int)
 		marshalled, err := json.MarshalIndent(globalDict, "", "  ")
 		if err != nil {
-			return err
+			return errors.New("error converting to json")
 
 		}
 
 		err = os.WriteFile(dirPath+string(os.PathSeparator)+GLOBALDICTNAME, marshalled, 0644)
 		if err != nil {
-			return err
+			return errors.New("error writting to json")
 		}
 	}
 
@@ -133,7 +134,10 @@ func (sst *SSTable) Flush(data []*record.Record) error {
 		return err
 	}
 
-	sst.Compress()
+	err = sst.Compress()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

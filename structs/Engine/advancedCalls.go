@@ -23,6 +23,7 @@ func (e *Engine) storeFingerprint(call string) {
 
 	err := e.writePath(key, fingerprintBytes, false)
 	if err != nil {
+		displayError(err)
 		return
 	}
 
@@ -35,8 +36,30 @@ func (e *Engine) simhHash(call string) {
 	key1 := "fingerprint " + name1
 	key2 := "fingerprint " + name2
 
-	rec1, _ := e.readPath(key1)
-	rec2, _ := e.readPath(key2)
+	rec1, err := e.readPath(key1)
+	if err != nil {
+		displayError(err)
+		return
+	}
+	if rec1 != nil {
+		if rec1.IsTombstone() {
+			return
+		}
+	} else {
+		return
+	}
+	rec2, err := e.readPath(key2)
+	if err != nil {
+		displayError(err)
+		return
+	}
+	if rec2 != nil {
+		if rec2.IsTombstone() {
+			return
+		}
+	} else {
+		return
+	}
 
 	fingerprint1 := binary.LittleEndian.Uint64(rec1.GetValue())
 	fingerprint2 := binary.LittleEndian.Uint64(rec2.GetValue())
@@ -65,7 +88,11 @@ func (e *Engine) makeStruct(call string) {
 		objBytes = obj.CMSToBytes()
 	}
 
-	e.writePath(key, objBytes, false)
+	err := e.writePath(key, objBytes, false)
+	if err != nil {
+		displayError(err)
+		return
+	}
 }
 
 func (e *Engine) destroy(call string) {
@@ -77,11 +104,13 @@ func (e *Engine) destroy(call string) {
 
 	rec, err := e.readPath(key)
 	if err != nil {
+		displayError(err)
 		return
 	}
 	if rec != nil {
 		err = e.writePath(rec.GetKey(), rec.GetValue(), true)
 		if err != nil {
+			displayError(err)
 			return
 		}
 	}
@@ -97,26 +126,50 @@ func (e *Engine) populateStruct(call string) {
 
 	objRec, err := e.readPath(key)
 	if err != nil {
+		displayError(err)
+		return
+	}
+	if objRec != nil {
+		if objRec.IsTombstone() {
+			return
+		}
+	} else {
 		return
 	}
 
 	objBytes := objRec.GetValue()
 
 	if structure == "bf" {
-		obj, _ := bloomFilter.BytesToBloomFilter(objBytes)
+		obj, err := bloomFilter.BytesToBloomFilter(objBytes)
+		if err != nil {
+			displayError(err)
+			return
+		}
 		obj.Add(value)
 		objBytes = obj.BloomFilterToBytes()
 	} else if structure == "hll" {
 		obj, _ := hll.BytesToHLL(objBytes)
-		obj.Add(value)
+		err := obj.Add(value)
+		if err != nil {
+			displayError(err)
+			return
+		}
 		objBytes, _ = obj.HLLToBytes()
 	} else if structure == "cms" {
-		obj, _ := cms.BytesToCMS(objBytes)
+		obj, err := cms.BytesToCMS(objBytes)
+		if err != nil {
+			displayError(err)
+			return
+		}
 		obj.Add(value)
 		objBytes = obj.CMSToBytes()
 	}
 
-	e.writePath(key, objBytes, false)
+	err = e.writePath(key, objBytes, false)
+	if err != nil {
+		displayError(err)
+		return
+	}
 }
 
 func (e *Engine) checkStruct(call string) {
@@ -132,19 +185,39 @@ func (e *Engine) checkStruct(call string) {
 
 	objRec, err := e.readPath(key)
 	if err != nil {
+		displayError(err)
+		return
+	}
+	if objRec != nil {
+		if objRec.IsTombstone() {
+			return
+		}
+	} else {
 		return
 	}
 
 	objBytes := objRec.GetValue()
 
 	if structure == "bf" {
-		obj, _ := bloomFilter.BytesToBloomFilter(objBytes)
+		obj, err := bloomFilter.BytesToBloomFilter(objBytes)
+		if err != nil {
+			displayError(err)
+			return
+		}
 		fmt.Println(obj.IsPresent(value))
 	} else if structure == "hll" {
-		obj, _ := hll.BytesToHLL(objBytes)
+		obj, err := hll.BytesToHLL(objBytes)
+		if err != nil {
+			displayError(err)
+			return
+		}
 		fmt.Println(obj.Estimate())
 	} else if structure == "cms" {
-		obj, _ := cms.BytesToCMS(objBytes)
+		obj, err := cms.BytesToCMS(objBytes)
+		if err != nil {
+			displayError(err)
+			return
+		}
 		fmt.Println(obj.Estimate(value))
 	}
 }

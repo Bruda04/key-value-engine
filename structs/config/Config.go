@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 )
@@ -78,7 +79,7 @@ func MakeConfig() (*Config, error) {
 	if _, err := os.Stat(CONFIG_PATH); !os.IsNotExist(err) {
 		configData, err := os.ReadFile(CONFIG_PATH)
 		if err != nil {
-			return &cfg, fmt.Errorf("error reading file: %s", err)
+			return &cfg, errors.New("error reading config file")
 		}
 
 		err = json.Unmarshal(configData, &cfg)
@@ -87,7 +88,7 @@ func MakeConfig() (*Config, error) {
 			if err != nil {
 				return &cfg, err
 			}
-			return &cfg, fmt.Errorf("error converting json to config: %s", err)
+			return &cfg, errors.New("error converting json file")
 		}
 
 		cfg.validate()
@@ -165,14 +166,14 @@ func (cfg *Config) writeConfig() error {
 	// Marshal the modified config back to JSON
 	marshalled, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
-		return fmt.Errorf("error converting config to json: %s", err)
+		return errors.New("error converting config to json")
 
 	}
 
 	// Write the JSON data to the file
 	err = os.WriteFile(CONFIG_PATH, marshalled, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing config to file: %s", err)
+		return errors.New("error writing config to file")
 	}
 
 	return nil

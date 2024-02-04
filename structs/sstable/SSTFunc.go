@@ -3,6 +3,7 @@ package sstable
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"key-value-engine/structs/bloomFilter"
 	"key-value-engine/structs/merkleTree"
 	"key-value-engine/structs/record"
@@ -14,12 +15,12 @@ func (sst *SSTable) putData(rec *record.Record, dirPath string) error {
 	if sst.compression {
 		globalDictData, err := os.ReadFile(dirPath + string(os.PathSeparator) + GLOBALDICTNAME)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		globalDict := make(map[string]int)
 		err = json.Unmarshal(globalDictData, &globalDict)
 		if err != nil {
-			return err
+			return errors.New("error reading json file")
 		}
 		dictIndex := len(globalDict) + 1
 
@@ -34,14 +35,14 @@ func (sst *SSTable) putData(rec *record.Record, dirPath string) error {
 
 		marshalled, err := json.MarshalIndent(globalDict, "", "  ")
 		if err != nil {
-			return err
+			return errors.New("error converting to json file")
 
 		}
 
 		// Write the JSON data to the file
 		err = os.WriteFile(dirPath+string(os.PathSeparator)+GLOBALDICTNAME, marshalled, 0644)
 		if err != nil {
-			return err
+			return errors.New("error writting sst file")
 		}
 
 		entrySerSizeBytes := make([]byte, binary.MaxVarintLen64)
@@ -58,31 +59,31 @@ func (sst *SSTable) putData(rec *record.Record, dirPath string) error {
 		path := dirPath + string(os.PathSeparator) + DATANAME
 		file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		_, err := file.Seek(0, 2)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 	} else {
 		path := dirPath + string(os.PathSeparator) + SINGLEFILENAME
 		file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		pos, err := file.Seek(0, 2)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		if pos < HEADERSIZE {
 			_, err = file.Seek(0, 0)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 
 			dataOffsetBytes := make([]byte, OFFSETSIZE)
@@ -90,25 +91,25 @@ func (sst *SSTable) putData(rec *record.Record, dirPath string) error {
 
 			_, err = file.Write(dataOffsetBytes)
 			if err != nil {
-				return err
+				return errors.New("error writting sst file")
 			}
 
 			_, err := file.Seek(HEADERSIZE, 0)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 		}
 	}
 
 	_, err = file.Write(sstEntry)
 	if err != nil {
-		return err
+		return errors.New("error writting sst file")
 	}
 
 	if !sst.multipleFiles {
 		pos, err := file.Seek(0, 1)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		indexOffsetBytes := make([]byte, OFFSETSIZE)
@@ -116,12 +117,12 @@ func (sst *SSTable) putData(rec *record.Record, dirPath string) error {
 
 		_, err = file.Seek(OFFSETSIZE, 0)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		_, err = file.Write(indexOffsetBytes)
 		if err != nil {
-			return err
+			return errors.New("error writting sst file")
 		}
 
 	}
@@ -140,32 +141,32 @@ func (sst *SSTable) formIndex(dirPath string) error {
 		path := dirPath + string(os.PathSeparator) + INDEXNAME
 		file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		pathData := dirPath + string(os.PathSeparator) + DATANAME
 		dataFile, err = os.OpenFile(pathData, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer dataFile.Close()
 
 		eofData, err = dataFile.Seek(0, 2)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		dataPos, err = dataFile.Seek(0, 0)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 	} else {
 		path := dirPath + string(os.PathSeparator) + SINGLEFILENAME
 		file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer file.Close()
 
@@ -173,14 +174,14 @@ func (sst *SSTable) formIndex(dirPath string) error {
 
 		eofData, err = file.Seek(0, 2)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		indexPos = eofData
 
 		dataPos, err = dataFile.Seek(HEADERSIZE, 0)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 	}
 
@@ -188,12 +189,12 @@ func (sst *SSTable) formIndex(dirPath string) error {
 	if sst.compression {
 		globalDictData, err := os.ReadFile(dirPath + string(os.PathSeparator) + GLOBALDICTNAME)
 		if err != nil {
-			return err
+			return errors.New("error reading json file")
 		}
 		globalDict = make(map[string]int)
 		err = json.Unmarshal(globalDictData, &globalDict)
 		if err != nil {
-			return err
+			return errors.New("error converting json file")
 		}
 	}
 
@@ -208,7 +209,7 @@ func (sst *SSTable) formIndex(dirPath string) error {
 		if !sst.multipleFiles {
 			_, err = dataFile.Seek(dataPos, 0)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 		}
 
@@ -221,7 +222,7 @@ func (sst *SSTable) formIndex(dirPath string) error {
 			// Read the SSTEntry size from the file into the buffer
 			_, err = dataFile.Read(bufSize[:])
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 
 			// Decode the SSTEntry size from the buffer
@@ -229,17 +230,20 @@ func (sst *SSTable) formIndex(dirPath string) error {
 
 			_, err = dataFile.Seek(-int64(binary.MaxVarintLen64-bytesRead), 1)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 
 			entryBytes := make([]byte, entrySize)
 
 			_, err = dataFile.Read(entryBytes)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 
 			sstEntry, err = record.SSTBytesToRecord(entryBytes, &globalDict)
+			if err != nil {
+				return err
+			}
 
 			dataPos += int64(len(entryBytes) + bytesRead)
 
@@ -248,7 +252,7 @@ func (sst *SSTable) formIndex(dirPath string) error {
 			headerBytes := make([]byte, record.RECORD_HEADER_SIZE)
 			_, err = dataFile.Read(headerBytes)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 
 			var recBytes []byte
@@ -260,7 +264,7 @@ func (sst *SSTable) formIndex(dirPath string) error {
 			secondPartBytes := make([]byte, keySize+valSize)
 			_, err = dataFile.Read(secondPartBytes)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 
 			recBytes = append(headerBytes, secondPartBytes...)
@@ -273,7 +277,7 @@ func (sst *SSTable) formIndex(dirPath string) error {
 		if !sst.multipleFiles {
 			_, err = file.Seek(indexPos, 0)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 		}
 
@@ -281,7 +285,7 @@ func (sst *SSTable) formIndex(dirPath string) error {
 
 		_, err = file.Write(indexEntry)
 		if err != nil {
-			return err
+			return errors.New("error writting sst file")
 		}
 
 		if !sst.multipleFiles {
@@ -293,7 +297,7 @@ func (sst *SSTable) formIndex(dirPath string) error {
 	if !sst.multipleFiles {
 		_, err = file.Seek(2*OFFSETSIZE, 0)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		summaryOffsetBytes := make([]byte, OFFSETSIZE)
@@ -301,7 +305,7 @@ func (sst *SSTable) formIndex(dirPath string) error {
 
 		_, err = file.Write(summaryOffsetBytes)
 		if err != nil {
-			return err
+			return errors.New("error writting sst file")
 		}
 	}
 
@@ -319,32 +323,32 @@ func (sst *SSTable) formSummary(dirPath string) error {
 		path := dirPath + string(os.PathSeparator) + SUMMARYNAME
 		summFile, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer summFile.Close()
 
 		pathIndex := dirPath + string(os.PathSeparator) + INDEXNAME
 		indexFile, err = os.OpenFile(pathIndex, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer indexFile.Close()
 
 		eofIndex, err = indexFile.Seek(0, 2)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		indexPos, err = indexFile.Seek(0, 0)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 	} else {
 		path := dirPath + string(os.PathSeparator) + SINGLEFILENAME
 		summFile, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer summFile.Close()
 
@@ -352,25 +356,25 @@ func (sst *SSTable) formSummary(dirPath string) error {
 
 		eofIndex, err = summFile.Seek(0, 2)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		_, err = summFile.Seek(0, 0)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		headerBytes := make([]byte, 5*OFFSETSIZE)
 		_, err = summFile.Read(headerBytes)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		indexOffset := binary.LittleEndian.Uint64(headerBytes[OFFSETSIZE : 2*OFFSETSIZE])
 
 		indexPos, err = indexFile.Seek(int64(indexOffset), 0)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 	}
 
@@ -389,9 +393,8 @@ func (sst *SSTable) formSummary(dirPath string) error {
 		// READ ENTRY
 		keySizeBytes := make([]byte, record.KEY_SIZE_SIZE)
 		_, err = indexFile.Read(keySizeBytes)
-
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		keySize := binary.LittleEndian.Uint64(keySizeBytes)
 
@@ -399,7 +402,7 @@ func (sst *SSTable) formSummary(dirPath string) error {
 		readKey := make([]byte, keySize)
 		_, err = indexFile.Read(readKey)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		if len(summData) == 0 {
@@ -410,7 +413,7 @@ func (sst *SSTable) formSummary(dirPath string) error {
 
 		_, err = indexFile.Seek(OFFSETSIZE, 1)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		if i%sst.summaryFactor == 0 {
@@ -438,22 +441,20 @@ func (sst *SSTable) formSummary(dirPath string) error {
 
 	summData = append(headerData, summData...)
 
-	// mozda seek
-
 	_, err = summFile.Write(summData)
 	if err != nil {
-		return err
+		return errors.New("error writting sst file")
 	}
 
 	if !sst.multipleFiles {
 		pos, err := summFile.Seek(0, 1)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		_, err = summFile.Seek(3*OFFSETSIZE, 0)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		bloomOffsetBytes := make([]byte, OFFSETSIZE)
@@ -461,7 +462,7 @@ func (sst *SSTable) formSummary(dirPath string) error {
 
 		_, err = summFile.Write(bloomOffsetBytes)
 		if err != nil {
-			return err
+			return errors.New("error writting sst file")
 		}
 	}
 
@@ -476,28 +477,31 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 		path := dirPath + string(os.PathSeparator) + DATANAME
 		dataFile, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer dataFile.Close()
 
 		eofData, err = dataFile.Seek(0, 2)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		_, err = dataFile.Seek(0, 0)
+		if err != nil {
+			return errors.New("error reading sst file")
+		}
 	} else {
 		path := dirPath + string(os.PathSeparator) + SINGLEFILENAME
 		dataFile, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer dataFile.Close()
 
 		headerBytes := make([]byte, 5*OFFSETSIZE)
 		_, err = dataFile.Read(headerBytes)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		dataOffset := binary.LittleEndian.Uint64(headerBytes[:OFFSETSIZE])
@@ -505,7 +509,7 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 
 		_, err = dataFile.Seek(int64(dataOffset), 0)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 	}
 
@@ -515,7 +519,7 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 	for {
 		pos, err := dataFile.Seek(0, 1)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		if pos >= eofData {
@@ -528,12 +532,12 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 		if sst.compression {
 			globalDictData, err := os.ReadFile(dirPath + string(os.PathSeparator) + GLOBALDICTNAME)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 			globalDict := make(map[string]int)
 			err = json.Unmarshal(globalDictData, &globalDict)
 			if err != nil {
-				return err
+				return errors.New("error converting json file")
 			}
 
 			var bufSize [binary.MaxVarintLen64]byte
@@ -541,7 +545,7 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 			// Read the SSTEntry size from the file into the buffer
 			_, err = dataFile.Read(bufSize[:])
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 
 			// Decode the SSTEntry size from the buffer
@@ -549,14 +553,14 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 
 			_, err = dataFile.Seek(-int64(binary.MaxVarintLen64-bytesRead), 1)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 
 			entryBytes = make([]byte, entrySize)
 
 			_, err = dataFile.Read(entryBytes)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 			rec, err = record.SSTBytesToRecord(entryBytes, &globalDict)
 			if err != nil {
@@ -567,7 +571,7 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 			headerBytes := make([]byte, record.RECORD_HEADER_SIZE)
 			_, err = dataFile.Read(headerBytes)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 
 			keySize := binary.LittleEndian.Uint64(headerBytes[record.KEY_SIZE_START:record.VALUE_SIZE_START])
@@ -577,7 +581,7 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 			secondPartBytes := make([]byte, keySize+valSize)
 			_, err = dataFile.Read(secondPartBytes)
 			if err != nil {
-				return err
+				return errors.New("error reading sst file")
 			}
 
 			entryBytes = append(headerBytes, secondPartBytes...)
@@ -601,14 +605,14 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 		path := dirPath + string(os.PathSeparator) + BLOOMNAME
 		bfFile, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer bfFile.Close()
 
 		path = dirPath + string(os.PathSeparator) + MERKLENAME
 		mtFile, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 		defer mtFile.Close()
 
@@ -621,27 +625,27 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 		// writting merkle
 		_, err = mtFile.Write(mtBytes)
 		if err != nil {
-			return err
+			return errors.New("error writting sst file")
 		}
 	} else {
 		_, err = dataFile.Seek(0, 2)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		_, err = dataFile.Write(bfBytes)
 		if err != nil {
-			return err
+			return errors.New("error writting sst file")
 		}
 
 		mtOffset, err := dataFile.Seek(0, 1)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		_, err = dataFile.Seek(4*OFFSETSIZE, 0)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		mtOffsetBytes := make([]byte, OFFSETSIZE)
@@ -649,17 +653,17 @@ func (sst *SSTable) formBfMt(dirPath string, dataLen int) error {
 
 		_, err = dataFile.Write(mtOffsetBytes)
 		if err != nil {
-			return err
+			return errors.New("error writting sst file")
 		}
 
 		_, err = dataFile.Seek(0, 2)
 		if err != nil {
-			return err
+			return errors.New("error reading sst file")
 		}
 
 		_, err = dataFile.Write(mtBytes)
 		if err != nil {
-			return err
+			return errors.New("error writting sst file")
 		}
 
 	}
@@ -681,21 +685,21 @@ func (sst *SSTable) checkBf(key string, dirPath string) (*record.Record, error) 
 
 		filterBytes, err = os.ReadFile(path)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 	} else {
 		path := dirPath + SINGLEFILENAME
 		file, err := os.Open(path)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		headerBytes := make([]byte, 5*OFFSETSIZE)
 		_, err = file.Read(headerBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		header := []uint64{
@@ -708,13 +712,13 @@ func (sst *SSTable) checkBf(key string, dirPath string) (*record.Record, error) 
 
 		_, err = file.Seek(int64(header[3]), 0)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		filterBytes = make([]byte, int64(header[4])-int64(header[3]))
 
 		_, err = file.Read(filterBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 	}
 
@@ -746,32 +750,32 @@ func (sst *SSTable) checkSummary(key string, dirPath string) (*record.Record, er
 		path := dirPath + SUMMARYNAME
 		file, err = os.Open(path)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		eof, err = file.Seek(0, 2)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		_, err = file.Seek(0, 0)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 	} else {
 		path := dirPath + SINGLEFILENAME
 		file, err = os.Open(path)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		headerBytes := make([]byte, 5*OFFSETSIZE)
 		_, err = file.Read(headerBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		header = []uint64{
@@ -784,7 +788,7 @@ func (sst *SSTable) checkSummary(key string, dirPath string) (*record.Record, er
 
 		_, err = file.Seek(int64(header[2]), 0)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		eof = int64(header[3])
@@ -794,7 +798,7 @@ func (sst *SSTable) checkSummary(key string, dirPath string) (*record.Record, er
 	keySizeBytes := make([]byte, record.KEY_SIZE_SIZE)
 	_, err = file.Read(keySizeBytes)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error reading sst file")
 	}
 
 	keySize := binary.LittleEndian.Uint64(keySizeBytes)
@@ -803,13 +807,13 @@ func (sst *SSTable) checkSummary(key string, dirPath string) (*record.Record, er
 	lowKey := make([]byte, keySize)
 	_, err = file.Read(lowKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error reading sst file")
 	}
 
 	// readinf high-key size
 	_, err = file.Read(keySizeBytes)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error reading sst file")
 	}
 	keySize = binary.LittleEndian.Uint64(keySizeBytes)
 
@@ -817,7 +821,7 @@ func (sst *SSTable) checkSummary(key string, dirPath string) (*record.Record, er
 	highKey := make([]byte, keySize)
 	_, err = file.Read(highKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error reading sst file")
 	}
 
 	// if out of range
@@ -831,7 +835,7 @@ func (sst *SSTable) checkSummary(key string, dirPath string) (*record.Record, er
 		// reading key size
 		position, err := file.Seek(0, 1)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		if position == eof {
 			return sst.checkIndex(key, dirPath, lastOffset)
@@ -839,7 +843,7 @@ func (sst *SSTable) checkSummary(key string, dirPath string) (*record.Record, er
 
 		_, err = file.Read(keySizeBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		keySize = binary.LittleEndian.Uint64(keySizeBytes)
@@ -848,14 +852,14 @@ func (sst *SSTable) checkSummary(key string, dirPath string) (*record.Record, er
 		readKey := make([]byte, keySize)
 		_, err = file.Read(readKey)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		// reading offset
 		offsetBytes := make([]byte, OFFSETSIZE)
 		_, err = file.Read(offsetBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		offset := binary.LittleEndian.Uint64(offsetBytes)
 
@@ -884,32 +888,32 @@ func (sst *SSTable) checkIndex(key string, dirPath string, offset uint64) (*reco
 		path := dirPath + INDEXNAME
 		file, err = os.Open(path)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		eof, err = file.Seek(0, 2)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		_, err = file.Seek(0, 0)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 	} else {
 		path := dirPath + SINGLEFILENAME
 		file, err = os.Open(path)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		headerBytes := make([]byte, 5*OFFSETSIZE)
 		_, err = file.Read(headerBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		header = []uint64{
@@ -922,7 +926,7 @@ func (sst *SSTable) checkIndex(key string, dirPath string, offset uint64) (*reco
 
 		_, err = file.Seek(int64(header[1]), 0)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		eof = int64(header[2])
@@ -931,7 +935,7 @@ func (sst *SSTable) checkIndex(key string, dirPath string, offset uint64) (*reco
 	// seeking to position
 	_, err = file.Seek(int64(offset), 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error reading sst file")
 	}
 
 	// looping through all entries in one range of index
@@ -941,14 +945,14 @@ func (sst *SSTable) checkIndex(key string, dirPath string, offset uint64) (*reco
 			break
 		}
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		// reading key size
 		keySizeBytes := make([]byte, record.KEY_SIZE_SIZE)
 		_, err = file.Read(keySizeBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		keySize := binary.LittleEndian.Uint64(keySizeBytes)
 
@@ -956,14 +960,14 @@ func (sst *SSTable) checkIndex(key string, dirPath string, offset uint64) (*reco
 		readKey := make([]byte, keySize)
 		_, err = file.Read(readKey)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		// reading offset
 		offsetBytes := make([]byte, OFFSETSIZE)
 		_, err = file.Read(offsetBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		offsetData := binary.LittleEndian.Uint64(offsetBytes)
 
@@ -992,21 +996,21 @@ func (sst *SSTable) checkData(offset uint64, dirPath string) (*record.Record, er
 		path := dirPath + DATANAME
 		file, err = os.Open(path)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		defer file.Close()
 	} else {
 		path := dirPath + SINGLEFILENAME
 		file, err = os.Open(path)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		headerBytes := make([]byte, 5*OFFSETSIZE)
 		_, err = file.Read(headerBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		header = []uint64{
@@ -1019,14 +1023,14 @@ func (sst *SSTable) checkData(offset uint64, dirPath string) (*record.Record, er
 
 		_, err = file.Seek(int64(header[0]), 0)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 	}
 
 	// seeking to position
 	_, err = file.Seek(int64(offset), 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error reading sst file")
 	}
 
 	var recBytes []byte
@@ -1037,7 +1041,7 @@ func (sst *SSTable) checkData(offset uint64, dirPath string) (*record.Record, er
 		// Read the SSTEntry size from the file into the buffer
 		_, err = file.Read(bufSize[:])
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		// Decode the SSTEntry size from the buffer
@@ -1045,24 +1049,24 @@ func (sst *SSTable) checkData(offset uint64, dirPath string) (*record.Record, er
 
 		_, err = file.Seek(-int64(binary.MaxVarintLen64-bytesRead), 1)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		entryBytes := make([]byte, entrySize)
 
 		_, err = file.Read(entryBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		globalDictData, err := os.ReadFile(dirPath + string(os.PathSeparator) + GLOBALDICTNAME)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 		globalDict := make(map[string]int)
 		err = json.Unmarshal(globalDictData, &globalDict)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error converting json file")
 		}
 
 		ret, err = record.SSTBytesToRecord(entryBytes, &globalDict)
@@ -1076,7 +1080,7 @@ func (sst *SSTable) checkData(offset uint64, dirPath string) (*record.Record, er
 		headerBytes := make([]byte, record.RECORD_HEADER_SIZE)
 		_, err = file.Read(headerBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		// getting key size
@@ -1087,7 +1091,7 @@ func (sst *SSTable) checkData(offset uint64, dirPath string) (*record.Record, er
 		secondPartBytes := make([]byte, keySize+valSize)
 		_, err = file.Read(secondPartBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("error reading sst file")
 		}
 
 		recBytes = append(headerBytes, secondPartBytes...)
@@ -1101,7 +1105,7 @@ func (sst *SSTable) checkData(offset uint64, dirPath string) (*record.Record, er
 	}
 
 	if !valid {
-		return nil, nil
+		return nil, errors.New("error value not valid")
 	}
 
 	return ret, nil
@@ -1121,31 +1125,31 @@ func (sst *SSTable) checkMerkle(data []byte, dirPath string) (bool, error) {
 		path := dirPath + MERKLENAME
 		file, err = os.Open(path)
 		if err != nil {
-			return false, err
+			return false, errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		eof, err = file.Seek(0, 2)
 		if err != nil {
-			return false, err
+			return false, errors.New("error reading sst file")
 		}
 
 		_, err = file.Seek(0, 0)
 		if err != nil {
-			return false, err
+			return false, errors.New("error reading sst file")
 		}
 	} else {
 		path := dirPath + SINGLEFILENAME
 		file, err = os.Open(path)
 		if err != nil {
-			return false, err
+			return false, errors.New("error reading sst file")
 		}
 		defer file.Close()
 
 		headerBytes := make([]byte, 5*OFFSETSIZE)
 		_, err = file.Read(headerBytes)
 		if err != nil {
-			return false, err
+			return false, errors.New("error reading sst file")
 		}
 
 		header = []uint64{
@@ -1158,12 +1162,12 @@ func (sst *SSTable) checkMerkle(data []byte, dirPath string) (bool, error) {
 
 		eof, err = file.Seek(0, 2)
 		if err != nil {
-			return false, err
+			return false, errors.New("error reading sst file")
 		}
 
 		_, err = file.Seek(int64(header[4]), 0)
 		if err != nil {
-			return false, err
+			return false, errors.New("error reading sst file")
 		}
 	}
 
@@ -1172,7 +1176,7 @@ func (sst *SSTable) checkMerkle(data []byte, dirPath string) (bool, error) {
 	mtBytes := make([]byte, eof-pos)
 	_, err = file.Read(mtBytes)
 	if err != nil {
-		return false, err
+		return false, errors.New("error reading sst file")
 	}
 
 	mt, err := merkleTree.BytesToMerkleTree(mtBytes)

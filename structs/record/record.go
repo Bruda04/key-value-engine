@@ -286,14 +286,14 @@ func SSTBytesToRecord(data []byte, globalDict *map[string]int) (*Record, error) 
 	// Read and decode the CRC
 	crc, n := binary.Uvarint(data)
 	if n <= 0 {
-		return nil, errors.New("failed to decode")
+		return nil, errors.New("failed to decode record")
 	}
 	data = data[n:]
 
 	// Read and decode the timestamp
 	timestamp, n := binary.Uvarint(data)
 	if n <= 0 {
-		return nil, errors.New("failed to decode")
+		return nil, errors.New("failed to decode record")
 	}
 	data = data[n:]
 
@@ -304,7 +304,7 @@ func SSTBytesToRecord(data []byte, globalDict *map[string]int) (*Record, error) 
 	// Read and decode the key size
 	keyIndex, n := binary.Uvarint(data)
 	if n <= 0 {
-		return nil, errors.New("failed to decode")
+		return nil, errors.New("failed to decode record")
 	}
 	data = data[n:]
 
@@ -329,7 +329,7 @@ func SSTBytesToRecord(data []byte, globalDict *map[string]int) (*Record, error) 
 	// Read and decode the value size
 	valueSize, n := binary.Uvarint(data)
 	if n <= 0 {
-		return nil, errors.New("failed to decode")
+		return nil, errors.New("failed to decode record")
 	}
 	data = data[n:]
 
