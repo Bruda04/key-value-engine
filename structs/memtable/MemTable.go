@@ -95,8 +95,11 @@ func (mem *MemTable) Put(rec *record.Record) {
 	} else if mem.structType == "skiplist" {
 		mem.skipList.Insert(rec)
 	} else {
+		_, exists := mem.hashMap[rec.GetKey()]
+		if !exists {
+			mem.keys = append(mem.keys, rec.GetKey())
+		}
 		mem.hashMap[rec.GetKey()] = rec
-		mem.keys = append(mem.keys, rec.GetKey())
 	}
 
 	mem.capacity += 1

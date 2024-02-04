@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"key-value-engine/structs/record"
 	"os"
+	"regexp"
+	"strconv"
 )
 
 type TableFile struct {
@@ -29,9 +31,13 @@ func (sst *SSTable) Compress() error {
 }
 func (sst *SSTable) compressSizeTier() error {
 	dirnamesByTier, _ := sst.getDirsByTier()
-	for i, tier := range dirnamesByTier {
-		if len(tier) >= sst.tablesToCompress {
-			compressionLevel := i + 1
+	re := regexp.MustCompile(`C(\d+)_`)
+	for _, tier := range dirnamesByTier {
+		match := re.FindStringSubmatch(tier[0])
+		lvl, _ := strconv.Atoi(match[1])
+
+		if len(tier) >= sst.tablesToCompress && lvl < sst.maxLSMLevels {
+			compressionLevel := lvl + 1
 			compressionTables := tier[:sst.tablesToCompress]
 
 			err := sst.extractDataSizeTier(compressionTables, compressionLevel)

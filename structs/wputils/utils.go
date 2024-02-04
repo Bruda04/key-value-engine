@@ -29,8 +29,7 @@ func AddRecord(manager *memtable.MemManager, walInstance *wal.WAL, restoreEndOff
 	if fileInfo.Size() == 0 {
 		filename := walInstance.SegmentFiles[len(walInstance.SegmentFiles)-1]
 		offset := strconv.FormatInt(addOffset, 10)
-		seekEnd, err := file.Seek(0, 2)
-		fmt.Println(seekEnd)
+		_, err := file.Seek(0, 2)
 		if err != nil {
 			return 0, err
 		}
@@ -56,8 +55,7 @@ func AddRecord(manager *memtable.MemManager, walInstance *wal.WAL, restoreEndOff
 	if isSwitch {
 		filename := walInstance.SegmentFiles[len(walInstance.SegmentFiles)-1]
 		offset := strconv.FormatInt(addOffset, 10)
-		seekEnd, err := file.Seek(0, 2)
-		fmt.Println(seekEnd)
+		_, err := file.Seek(0, 2)
 		if err != nil {
 			return 0, err
 		}
@@ -98,7 +96,7 @@ func AddRecord(manager *memtable.MemManager, walInstance *wal.WAL, restoreEndOff
 
 func Restore(manager *memtable.MemManager, walInstance *wal.WAL) (int64, error) {
 	var retOffset int64
-	file, err := os.Open("data" + string(os.PathSeparator) + "memwal.csv")
+	file, err := os.OpenFile("data"+string(os.PathSeparator)+"memwal.csv", os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return 0, err
 	}

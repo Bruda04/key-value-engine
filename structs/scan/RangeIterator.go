@@ -41,10 +41,10 @@ func (rit *RangeIterator) Next() *record.Record {
 	for id, it := range rit.iterators {
 		if it.Valid() {
 			//can also be replaced if == because it might be a newer version
-			if ret == nil || (it.Get().GetKey() <= ret.GetKey() && !it.Get().IsTombstone()) {
+			if ret == nil || (ret != nil && it.Get().GetKey() <= ret.GetKey()) {
 				if ret != nil && ret.GetKey() == it.Get().GetKey() {
 					//if they're duplicates only replace it if its newer
-					if ret.GetTimestamp() > it.Get().GetTimestamp() {
+					if ret.GetTimestamp() < it.Get().GetTimestamp() {
 						rit.iterators[incrementId].Next() //if ret had an old version skip it, so it doesnt appear in next round
 						ret = it.Get()
 						incrementId = id
@@ -66,7 +66,12 @@ func (rit *RangeIterator) Next() *record.Record {
 	if ret == nil {
 		rit.Stop()
 	}
-	return ret
+
+	if ret != nil && ret.IsTombstone() {
+		return rit.Next()
+	} else {
+		return ret
+	}
 }
 
 func (rit *RangeIterator) Stop() {

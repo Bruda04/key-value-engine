@@ -1,7 +1,6 @@
 package memtable
 
 import (
-	"fmt"
 	"key-value-engine/structs/iterator"
 	"key-value-engine/structs/record"
 	"key-value-engine/structs/sstable"
@@ -50,8 +49,6 @@ func (mm *MemManager) FlushMem() {
 		return
 	}
 	mm.currentTable.Clear()
-	//flush acompanying wal
-	fmt.Println("Flush this shit")
 }
 
 func (mm *MemManager) SwitchTable() {

@@ -10,9 +10,9 @@ const (
 	CONFIG_DIR  = "conf"
 	CONFIG_PATH = "conf" + string(os.PathSeparator) + "config.json"
 
-	DEFAULT_WALSIZE             = 20
-	DEFAULT_MEMTABLESIZE        = 20
-	DEFAULT_MEMTABLECOUNT       = 5
+	DEFAULT_WALSIZE             = 1048576
+	DEFAULT_MEMTABLESIZE        = 1000
+	DEFAULT_MEMTABLECOUNT       = 3
 	DEFAULT_MEMTABLESTRUCT      = "btree"
 	DEFAULT_SKIPLISTMAXHEIGHT   = 20
 	DEFAULT_BTREEDEGREE         = 4
@@ -20,8 +20,8 @@ const (
 	DEFAULT_FILESSST            = true
 	DEFAULT_SUMMARYINDEXDENSITY = 5
 	DEFAULT_DO_COMPRESSION      = false
-	DEFAULT_MAXLSMLEVELS        = 10
-	DEFAULT_TABLESTOCOMPRESS    = 5
+	DEFAULT_MAXLSMLEVELS        = 4
+	DEFAULT_TABLESTOCOMPRESS    = 8
 	DEFAULT_COMPRESSIONTYPE     = "size-tiered"
 	DEFAULT_TOKENCAPACITY       = 10
 	DEFAULT_REFILLCOOLDOWN      = 60
@@ -104,11 +104,11 @@ func MakeConfig() (*Config, error) {
 }
 
 func (cfg *Config) validate() {
-	if cfg.WalSize < 0 {
+	if cfg.WalSize < 200 {
 		cfg.WalSize = DEFAULT_WALSIZE
 	}
 
-	if cfg.MemtableSize < 0 {
+	if cfg.MemtableSize < 5 {
 		cfg.MemtableSize = DEFAULT_MEMTABLESIZE
 	}
 
@@ -140,11 +140,11 @@ func (cfg *Config) validate() {
 		cfg.CompressionType = DEFAULT_COMPRESSIONTYPE
 	}
 
-	if cfg.MaxLsmLevels < 2 || cfg.MaxLsmLevels > 20 {
+	if cfg.MaxLsmLevels < 2 || cfg.MaxLsmLevels > 50 {
 		cfg.MaxLsmLevels = DEFAULT_MAXLSMLEVELS
 	}
 
-	if cfg.TablesToCompress < 2 || cfg.TablesToCompress > 8 {
+	if cfg.TablesToCompress < 2 || cfg.TablesToCompress > 15 {
 		cfg.TablesToCompress = DEFAULT_TABLESTOCOMPRESS
 	}
 
