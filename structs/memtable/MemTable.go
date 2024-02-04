@@ -84,7 +84,11 @@ func (mem *MemTable) Find(key string) (bool, *record.Record) {
 		return mem.skipList.Find(key)
 	} else {
 		element, found := mem.hashMap[key]
-		return found, element
+		if found {
+			return !element.IsTombstone(), element
+		} else {
+			return false, nil
+		}
 	}
 }
 

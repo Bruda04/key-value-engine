@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 )
 
@@ -27,6 +26,8 @@ const (
 	DEFAULT_TOKENCAPACITY       = 10
 	DEFAULT_REFILLCOOLDOWN      = 60
 	DEFAULT_FILTERPRECISION     = 0.1
+	DEFAULT_FIRST_LEVELED_SIZE  = 10000
+	DEAFAULT_LEVELED_INC        = 10
 )
 
 type Config struct {
@@ -46,12 +47,14 @@ type Config struct {
 	TokenCapacity       uint64  `json:"token_capacity"`
 	RefillCooldown      uint64  `json:"refill_cooldown"`
 	FilterPrecsion      float64 `json:"filter_precsion"`
+	FirstLeveledSize    uint64  `json:"first_leveled_size"`
+	LeveledInc          uint64  `json:"leveled_inc"`
 }
 
 func MakeConfig() (*Config, error) {
-	var cfg Config
+	var cfgDefault Config
 
-	cfg = Config{
+	cfg := Config{
 		WalSize:             DEFAULT_WALSIZE,
 		MemtableSize:        DEFAULT_MEMTABLESIZE,
 		MemtableCount:       DEFAULT_MEMTABLECOUNT,
@@ -68,27 +71,50 @@ func MakeConfig() (*Config, error) {
 		TokenCapacity:       DEFAULT_TOKENCAPACITY,
 		RefillCooldown:      DEFAULT_REFILLCOOLDOWN,
 		FilterPrecsion:      DEFAULT_FILTERPRECISION,
+		FirstLeveledSize:    DEFAULT_FIRST_LEVELED_SIZE,
+		LeveledInc:          DEAFAULT_LEVELED_INC,
+	}
+
+	cfgDefault = Config{
+		WalSize:             DEFAULT_WALSIZE,
+		MemtableSize:        DEFAULT_MEMTABLESIZE,
+		MemtableCount:       DEFAULT_MEMTABLECOUNT,
+		MemtableStructure:   DEFAULT_MEMTABLESTRUCT,
+		BTreeDegree:         DEFAULT_BTREEDEGREE,
+		SkipListMaxHeight:   DEFAULT_SKIPLISTMAXHEIGHT,
+		CacheSize:           DEFAULT_CACHESIZE,
+		MultipleFilesSST:    DEFAULT_FILESSST,
+		SummaryIndexDensity: DEFAULT_SUMMARYINDEXDENSITY,
+		Compress:            DEFAULT_DO_COMPRESSION,
+		CompressionType:     DEFAULT_COMPRESSIONTYPE,
+		MaxLsmLevels:        DEFAULT_MAXLSMLEVELS,
+		TablesToCompress:    DEFAULT_TABLESTOCOMPRESS,
+		TokenCapacity:       DEFAULT_TOKENCAPACITY,
+		RefillCooldown:      DEFAULT_REFILLCOOLDOWN,
+		FilterPrecsion:      DEFAULT_FILTERPRECISION,
+		FirstLeveledSize:    DEFAULT_FIRST_LEVELED_SIZE,
+		LeveledInc:          DEAFAULT_LEVELED_INC,
 	}
 
 	if _, err := os.Stat(CONFIG_DIR); os.IsNotExist(err) {
 		if err := os.MkdirAll(CONFIG_DIR, 0755); err != nil {
-			return &cfg, fmt.Errorf("error creating conf directory: %s", err)
+			return &cfgDefault, errors.New("error creating conf directory")
 		}
 	}
 
 	if _, err := os.Stat(CONFIG_PATH); !os.IsNotExist(err) {
 		configData, err := os.ReadFile(CONFIG_PATH)
 		if err != nil {
-			return &cfg, errors.New("error reading config file")
+			return &cfgDefault, errors.New("error reading config file")
 		}
 
 		err = json.Unmarshal(configData, &cfg)
 		if err != nil {
-			err := cfg.writeConfig()
+			err := cfgDefault.writeConfig()
 			if err != nil {
-				return &cfg, err
+				return &cfgDefault, err
 			}
-			return &cfg, errors.New("error converting json file")
+			return &cfgDefault, errors.New("error converting json file")
 		}
 
 		cfg.validate()
@@ -105,7 +131,7 @@ func MakeConfig() (*Config, error) {
 }
 
 func (cfg *Config) validate() {
-	if cfg.WalSize < 200 {
+	if cfg.WalSize < 750 {
 		cfg.WalSize = DEFAULT_WALSIZE
 	}
 
@@ -159,6 +185,14 @@ func (cfg *Config) validate() {
 
 	if cfg.FilterPrecsion < 0.01 || cfg.FilterPrecsion > 0.5 {
 		cfg.FilterPrecsion = DEFAULT_FILTERPRECISION
+	}
+
+	if cfg.FirstLeveledSize < 3000 || cfg.FirstLeveledSize > 1000000 {
+		cfg.FirstLeveledSize = DEFAULT_FIRST_LEVELED_SIZE
+	}
+
+	if cfg.LeveledInc < 1 || cfg.LeveledInc > 20 {
+		cfg.LeveledInc = DEAFAULT_LEVELED_INC
 	}
 }
 

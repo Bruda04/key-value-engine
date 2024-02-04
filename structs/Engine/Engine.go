@@ -23,7 +23,7 @@ type Engine struct {
 func MakeEngine() *Engine {
 	cfg, err := config.MakeConfig()
 	if err != nil {
-		return nil
+		displayError(err)
 	}
 
 	tb := tokenBucket.MakeTokenBucket(int64(cfg.TokenCapacity), int64(cfg.RefillCooldown))
@@ -38,6 +38,8 @@ func MakeEngine() *Engine {
 		int(cfg.MaxLsmLevels),
 		int(cfg.TablesToCompress),
 		cfg.CompressionType,
+		cfg.FirstLeveledSize,
+		cfg.LeveledInc,
 	)
 
 	lruCache := cache.NewLRUCache(int(cfg.CacheSize))

@@ -87,10 +87,10 @@ func (mm *MemManager) GetCurrentTable() *MemTable {
 // FindInMem find if element exists in any of the memtables
 func (mm *MemManager) FindInMem(key string) (bool, *record.Record) {
 	for i := 0; i < mm.maxTables; i++ {
-		found, el := mm.tables[i].Find(key)
-		if found {
-			return found, el
-		}
+		m := (mm.currentIndex - i) % mm.maxTables
+		found, el := mm.tables[m].Find(key)
+		return found, el
+
 	}
 	return false, nil
 }

@@ -33,9 +33,11 @@ type SSTable struct {
 	maxLSMLevels       int
 	tablesToCompress   int    // when there's n sstables on the same level, compress them
 	compressionTypeLSM string // size-tiered or leveled
+	firstLeveledSize   uint64
+	leveledInc         uint64
 }
 
-func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float64, compress bool, maxLSMLevels int, tablesToCompress int, compressionType string) (*SSTable, error) {
+func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float64, compress bool, maxLSMLevels int, tablesToCompress int, compressionType string, firstLeveledSize uint64, leveledInc uint64) (*SSTable, error) {
 	if _, err := os.Stat(DIRECTORY); os.IsNotExist(err) {
 		if err := os.MkdirAll(DIRECTORY, 0755); err != nil {
 			return nil, fmt.Errorf("error creating sstable directory: %s", err)
@@ -58,6 +60,8 @@ func MakeSSTable(summaryFactor int, multipleFiles bool, filterProbability float6
 		maxLSMLevels:       maxLSMLevels,
 		tablesToCompress:   tablesToCompress,
 		compressionTypeLSM: compressionType,
+		firstLeveledSize:   firstLeveledSize,
+		leveledInc:         leveledInc,
 	}, nil
 }
 

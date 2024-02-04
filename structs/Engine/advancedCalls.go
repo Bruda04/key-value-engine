@@ -7,6 +7,8 @@ import (
 	"key-value-engine/structs/cms"
 	"key-value-engine/structs/hll"
 	"key-value-engine/structs/simHash"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -78,13 +80,63 @@ func (e *Engine) makeStruct(call string) {
 
 	var objBytes []byte
 	if structure == "bf" {
-		obj := bloomFilter.MakeBloomFilter(100, 0.1)
+		regEl := regexp.MustCompile(`^\d+$`)
+		regPrec := regexp.MustCompile(`^0\.\d+$`)
+		fmt.Print("Enter expected elements: ")
+		input := getInput()
+		if !regEl.MatchString(input) {
+			fmt.Println("invalid input")
+			return
+		}
+		expectedEl, _ := strconv.ParseInt(input, 10, 64)
+		fmt.Print("Enter precision: ")
+		input = getInput()
+		if !regPrec.MatchString(input) {
+			fmt.Println("invalid input")
+			return
+		}
+		precision, _ := strconv.ParseFloat(input, 64)
+
+		obj := bloomFilter.MakeBloomFilter(uint64(expectedEl), precision)
 		objBytes = obj.BloomFilterToBytes()
+
 	} else if structure == "hll" {
-		obj, _ := hll.MakeHLL(12)
+		regPr := regexp.MustCompile(`^\d+$`)
+		fmt.Print("Enter precision: ")
+		input := getInput()
+		if !regPr.MatchString(input) {
+			fmt.Println("invalid input")
+			return
+		}
+		precision, _ := strconv.ParseInt(input, 10, 64)
+		obj, err := hll.MakeHLL(uint8(precision))
+		if err != nil {
+			fmt.Println("invalid input range")
+			return
+		}
 		objBytes, _ = obj.HLLToBytes()
 	} else if structure == "cms" {
-		obj := cms.MakeCMS(0.1, 0.9)
+		regFlt := regexp.MustCompile(`^0\.\d+$`)
+		fmt.Print("Enter epsilon: ")
+		input := getInput()
+		if !regFlt.MatchString(input) {
+			fmt.Println("invalid input")
+			return
+		}
+		epsilon, _ := strconv.ParseFloat(input, 64)
+		fmt.Print("Enter delta: ")
+		input = getInput()
+		if !regFlt.MatchString(input) {
+			fmt.Println("invalid input")
+			return
+		}
+		delta, _ := strconv.ParseFloat(input, 64)
+		if epsilon <= 0 || delta <= 0 {
+			fmt.Println("invalid input range")
+			return
+		}
+
+		obj := cms.MakeCMS(epsilon, delta)
 		objBytes = obj.CMSToBytes()
 	}
 

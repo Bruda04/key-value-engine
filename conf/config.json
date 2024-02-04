@@ -3,16 +3,18 @@
   "memtable_size": 1000,
   "memtable_count": 3,
   "memtable_structure": "btree",
-  "btree_degree": 5,
+  "btree_degree": 4,
   "skip_list_max_height": 20,
   "cahce_size": 5,
   "separate_sst_files": true,
   "summary_index_density": 5,
-  "do_compression": true,
+  "do_compression": false,
   "compression_type": "size-tiered",
   "max_lsm_levels": 4,
   "tables_to_compress": 8,
   "token_capacity": 10,
   "refill_cooldown": 60,
-  "filter_precsion": 0.1
+  "filter_precsion": 0.1,
+  "first_leveled_size": 10000,
+  "leveled_inc": 10
 }

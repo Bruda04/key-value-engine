@@ -24,6 +24,10 @@ func (e *Engine) writePath(key string, value []byte, deleted bool) error {
 func (e *Engine) readPath(key string) (*record.Record, error) {
 	fnd, rec := e.memMan.FindInMem(key)
 	if fnd {
+		if rec.IsTombstone() {
+			return nil, nil
+		}
+
 		crc := record.CrcHash(rec.GetValue())
 
 		if crc != rec.GetCrc() {

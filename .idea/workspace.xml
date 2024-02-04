@@ -6,22 +6,17 @@
   <component name="ChangeListManager">
     <list default="true" id="4e3fdbfe-0dbb-4905-bd67-baf662ef0309" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/conf/config.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/structs/Engine/Engine.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/Engine/Engine.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/structs/Engine/advancedCalls.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/Engine/advancedCalls.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/structs/Engine/baseCalls.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/Engine/baseCalls.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/structs/Engine/rwPath.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/Engine/rwPath.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/structs/config/Config.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/config/Config.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/structs/hll/hll.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/hll/hll.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/structs/memtable/MemManager.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/memtable/MemManager.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/structs/record/record.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/record/record.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/structs/sstable/SSTFunc.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/sstable/SSTFunc.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/structs/memtable/MemTable.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/memtable/MemTable.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/structs/sstable/SSTable.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/sstable/SSTable.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/structs/sstable/lsm.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/sstable/lsm.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/structs/sstable/utils.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/sstable/utils.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/structs/tokenBucket/token.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/tokenBucket/token.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/structs/wal/wal.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/wal/wal.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/structs/wputils/utils.go" beforeDir="false" afterPath="$PROJECT_DIR$/structs/wputils/utils.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,7 +50,7 @@
     &quot;git-widget-placeholder&quot;: &quot;develop&quot;,
     &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
     &quot;go.sdk.automatically.set&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/bradi/Documents/Fakultet/3.SEMESTAR/Napredni algoritmi i strukture podataka/E2&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/bradi/Documents/Fakultet/3.SEMESTAR/Napredni algoritmi i strukture podataka/Projekat/key-value-engine&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;
   }

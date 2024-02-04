@@ -1,6 +1,7 @@
 package Engine
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -47,7 +48,7 @@ func (e *Engine) get(call string) {
 		return
 	}
 	if rec != nil {
-		rec.PrintRecord()
+		fmt.Println(string(rec.GetValue()))
 	}
 }
 

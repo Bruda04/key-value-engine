@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"key-value-engine/structs/record"
+	"math"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 )
@@ -26,7 +28,10 @@ func (sst *SSTable) Compress() error {
 			return err
 		}
 	} else {
-		sst.compressLeveled()
+		err := sst.compressLeveled()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -57,7 +62,7 @@ func (sst *SSTable) compressSizeTier() error {
 
 func (sst *SSTable) extractDataSizeTier(tablesPaths []string, level int) error {
 	var dataFiles []*TableFile
-	dirPath := SUBDIR + fmt.Sprintf("C%d_SST_%d", level+1, sst.nextIndex)
+	dirPath := SUBDIR + fmt.Sprintf("C%d_SST_%d", level, sst.nextIndex)
 	err := os.Mkdir(dirPath, os.ModePerm)
 	if err != nil {
 		return errors.New("error making SST direcory")
@@ -269,6 +274,170 @@ func makeTableFile(file *os.File, isMultifile bool, currentOffset int, lastOffse
 	}
 }
 
-func (sst *SSTable) compressLeveled() {
-	// to be done
+func (sst *SSTable) compressLeveled() error {
+	dirnamesByTier, _ := sst.getDirsByTier()
+	re := regexp.MustCompile(`C(\d+)_`)
+	for id, tier := range dirnamesByTier {
+		match := re.FindStringSubmatch(tier[0])
+		lvl, _ := strconv.Atoi(match[1])
+
+		if lvl == sst.maxLSMLevels {
+			return nil
+		}
+
+		//calculating level size
+		sizeOfTier := 0
+		for _, filePath := range tier {
+			sizeOfFile, err := getDirectorySize(filePath)
+			if err == nil {
+				sizeOfTier += int(sizeOfFile)
+			}
+		}
+
+		for sizeOfTier > int(float64(sst.firstLeveledSize)*math.Pow(float64(sst.leveledInc), float64(lvl-1))) {
+			freedMemory, _ := getDirectorySize(tier[0])
+			sizeOfTier -= freedMemory
+			if len(dirnamesByTier) == lvl { //this is the current final level
+				err := sst.extractDataSizeTier([]string{tier[0]}, lvl+1)
+				err = os.RemoveAll(tier[0])
+				if err != nil {
+					return err
+				}
+				return sst.compressLeveled()
+			}
+
+			lowK, highK, err := sst.findHighLowKey(tier[0])
+			if err != nil {
+				return err
+			}
+			compressionTables := []string{tier[0]}
+			compressionLevel := lvl + 1
+
+			for _, nextLvlFile := range dirnamesByTier[id+1] {
+				low, high, err := sst.findHighLowKey(nextLvlFile)
+				if err != nil {
+					return err
+				}
+				if !(lowK > high || highK < low) {
+					compressionTables = append(compressionTables, nextLvlFile)
+				}
+			}
+
+			err = sst.extractDataSizeTier(compressionTables, compressionLevel)
+			if err != nil {
+				return err
+			}
+			for _, dirname := range compressionTables {
+				err = os.RemoveAll(dirname)
+			}
+			return sst.compressLeveled()
+		}
+
+	}
+	return nil
+}
+
+func getDirectorySize(dirPath string) (int, error) {
+	var size int64
+
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+
+	return int(size), err
+}
+
+func (sst *SSTable) findHighLowKey(dirPath string) (string, string, error) {
+	var err error
+	var file *os.File
+	var header []uint64
+	files, err := readTOC(dirPath)
+	if err != nil {
+		return "", "", err
+	}
+
+	if len(files) > 1 {
+		path := dirPath + SUMMARYNAME
+		file, err = os.Open(path)
+		if err != nil {
+			return "", "", errors.New("error reading sst file")
+		}
+		defer file.Close()
+
+		_, err = file.Seek(0, 2)
+		if err != nil {
+			return "", "", errors.New("error reading sst file")
+		}
+
+		_, err = file.Seek(0, 0)
+		if err != nil {
+			return "", "", errors.New("error reading sst file")
+		}
+
+	} else {
+		path := dirPath + SINGLEFILENAME
+		file, err = os.Open(path)
+		if err != nil {
+			return "", "", errors.New("error reading sst file")
+		}
+		defer file.Close()
+
+		headerBytes := make([]byte, 5*OFFSETSIZE)
+		_, err = file.Read(headerBytes)
+		if err != nil {
+			return "", "", errors.New("error reading sst file")
+		}
+
+		header = []uint64{
+			binary.LittleEndian.Uint64(headerBytes[:OFFSETSIZE]),
+			binary.LittleEndian.Uint64(headerBytes[OFFSETSIZE : 2*OFFSETSIZE]),
+			binary.LittleEndian.Uint64(headerBytes[2*OFFSETSIZE : 3*OFFSETSIZE]),
+			binary.LittleEndian.Uint64(headerBytes[3*OFFSETSIZE : 4*OFFSETSIZE]),
+			binary.LittleEndian.Uint64(headerBytes[4*OFFSETSIZE:]),
+		}
+
+		_, err = file.Seek(int64(header[2]), 0)
+		if err != nil {
+			return "", "", errors.New("error reading sst file")
+		}
+
+	}
+
+	// reading low-key size
+	keySizeBytes := make([]byte, record.KEY_SIZE_SIZE)
+	_, err = file.Read(keySizeBytes)
+	if err != nil {
+		return "", "", errors.New("error reading sst file")
+	}
+
+	keySize := binary.LittleEndian.Uint64(keySizeBytes)
+
+	// reading low-key
+	lowKey := make([]byte, keySize)
+	_, err = file.Read(lowKey)
+	if err != nil {
+		return "", "", errors.New("error reading sst file")
+	}
+
+	// readinf high-key size
+	_, err = file.Read(keySizeBytes)
+	if err != nil {
+		return "", "", errors.New("error reading sst file")
+	}
+	keySize = binary.LittleEndian.Uint64(keySizeBytes)
+
+	// reading high-key
+	highKey := make([]byte, keySize)
+	_, err = file.Read(highKey)
+	if err != nil {
+		return "", "", errors.New("error reading sst file")
+	}
+
+	return string(lowKey), string(highKey), nil
 }
